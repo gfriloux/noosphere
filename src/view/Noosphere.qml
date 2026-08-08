@@ -43,6 +43,7 @@ QtObject {
     // --- État interne du driver séquentiel ---
     property var _inputs: [] // inputs bruts (parseMetadata), avant retard
     property var _behind: ({}) // accumulateur name → behind
+    property var _heads: ({}) // accumulateur name → head amont résolu (pour le lien changelog)
     property var _queue: [] // inputs github à comparer
     property int _cursor: 0
     property bool _busy: false
@@ -106,6 +107,7 @@ QtObject {
             return;
         root._inputs = Model.parseMetadata(meta);
         root._behind = {};
+        root._heads = {};
         // File des inputs github (les autres types sont affichés, jamais comparés).
         var q = [];
         for (var i = 0; i < root._inputs.length; i++)
@@ -153,6 +155,7 @@ QtObject {
     }
 
     function _compare(it, head) {
+        root._heads[it.name] = head; // mémorisé pour le lien changelog de la vue
         cmpProc.command = root._ghGet(Queries.compareApiUrl(root.apiBase, it.owner, it.repoName, it.lockRev, head));
         cmpProc.running = true;
     }
@@ -184,6 +187,13 @@ QtObject {
 
     function _commit() {
         var list = Model.mergeBehind(root._inputs, root._behind);
+        // Enrichit chaque input du head amont résolu (channel ou branche par défaut) : sert
+        // au lien changelog de la vue. Hors modèle golden (dépend de la résolution réseau).
+        var heads = root._heads;
+        list = list.map(function (it) {
+            it.head = heads[it.name] || it.channel || "";
+            return it;
+        });
         root.inputs = list;
         root.behindCount = Model.behindCount(list);
         root.upToDateCount = Model.upToDateCount(list);
