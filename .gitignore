@@ -1,0 +1,16 @@
+# Nix
+/result
+/result-*
+.direnv
+.envrc
+
+# Scratch — design handoffs, notes, sorties de travail (jamais commité)
+tmp/
+
+# Claude Code — réglages locaux et worktrees d'agents (les plans, eux, sont versionnés)
+.claude/settings.local.json
+.claude/worktrees/
+
+# Éditeurs
+*.qmlc
+*.jsc

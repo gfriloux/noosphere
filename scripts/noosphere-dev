@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# noosphere-dev — lance une instance DankMaterialShell *isolée* qui ne charge QUE le plugin
+# noosphere du worktree courant. Sert à tester la version en cours sans toucher au DMS
+# quotidien (géré, lui, par le module home-manager).
+#
+# Isolation : XDG_CONFIG_HOME + XDG_CACHE_HOME dédiés → settings, dossier de plugins et
+# qmlcache séparés de l'instance quotidienne. Le plugin pointe en symlink (live) sur le
+# src/ du worktree : on édite, on relance, c'est visible (cache isolé → pas de purge).
+#
+# L'id du manifeste reste "noosphere" : il doit rester aligné avec `pluginId` dans
+# src/view/Settings.qml (sinon les réglages sont écrits/lus sous des clés différentes).
+# Seul le libellé affiché passe à "Noosphere (dev)" pour distinguer les deux barres.
+#
+# Astuce dev : lancer d'abord `just mock` dans un autre terminal, puis régler l'endpoint
+# GitHub du plugin sur http://127.0.0.1:8385 (aucun réseau requis).
+set -euo pipefail
+
+# Racine du dépôt (contient plugin.json + src/). Défaut : répertoire courant.
+if [ "$#" -gt 0 ]; then
+    src="$1"
+    shift
+else
+    src="$PWD"
+fi
+src="$(cd "$src" && pwd)"
+
+if [ ! -f "$src/plugin.json" ] || [ ! -d "$src/src" ]; then
+    echo "noosphere-dev : '$src' ne contient pas plugin.json + src/ (pointe la racine du dépôt)." >&2
+    exit 1
+fi
+command -v dms >/dev/null || { echo "noosphere-dev : 'dms' introuvable sur le PATH." >&2; exit 1; }
+command -v jq  >/dev/null || { echo "noosphere-dev : 'jq' introuvable sur le PATH." >&2; exit 1; }
+
+root="${XDG_STATE_HOME:-$HOME/.local/state}/noosphere-dev"
+export XDG_CONFIG_HOME="$root/config"
+export XDG_CACHE_HOME="$root/cache"
+export XDG_STATE_HOME="$root/state"
+
+plugindir="$XDG_CONFIG_HOME/DankMaterialShell/plugins/Noosphere"
+mkdir -p "$plugindir"
+
+# plugin.json dérivé du worktree : seul le libellé change, l'id reste "noosphere".
+jq '.name = "Noosphere (dev)"' "$src/plugin.json" >"$plugindir/plugin.json"
+# src live : symlink hors-store vers le worktree.
+ln -sfn "$src/src" "$plugindir/src"
+
+echo "noosphere-dev : instance DMS isolée"
+echo "  source : $src/src (live)"
+echo "  config : $XDG_CONFIG_HOME"
+echo "  cache  : $XDG_CACHE_HOME"
+echo "  → active 'Noosphere (dev)' dans CETTE instance (Settings → Plugins)."
+echo "  → règle l'endpoint GitHub du plugin sur http://127.0.0.1:8385 (avec 'just mock')."
+echo "  (Ctrl-C pour arrêter l'instance dev.)"
+
+# `dms run` = `qs -c dms` : sans la sous-commande `run`, dms n'affiche que son usage.
+exec dms run "$@"
