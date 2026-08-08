@@ -1,0 +1,3 @@
+{
+  "text": "<<< /run/current-system\n>>> /nix/store/abc-nixos-system-host\nVersion changes:\n[U*]  #1  linux           6.12.9 -> 6.12.11\n[C.]  #2  linux-firmware  20240909 -> 20241017\n[C.]  #3  firefox         134.0 -> 135.0\nRemoved packages:\n[R.]  #1  oldpkg  1.0\nClosure size: 8234 -> 8318 (40 paths added, 8 paths removed, delta +32, disk usage +84.1MiB).\n"
+}

@@ -35,3 +35,42 @@ function compareApiUrl(apiBase, owner, repo, base, head) {
 function repoApiUrl(apiBase, owner, repo) {
     return (apiBase || GITHUB_API) + "/repos/" + owner + "/" + repo;
 }
+
+// --- Diff de closure (v0.2.0, build à la demande — cf. DESIGN.md) ---
+
+// Référence flake d'un input github verrouillé sur son amont : github:<owner>/<repo>/<ref>.
+// `ref` = branche suivie (channel ou branche par défaut). Résout au dernier commit de la
+// branche à l'évaluation → cible d'un --override-input pour prévisualiser une mise à jour.
+function githubFlakeRef(owner, repo, ref) {
+    return "github:" + owner + "/" + repo + "/" + ref;
+}
+
+// nix build du toplevel de la config NixOS <host> du flake <path>, SANS activation.
+// `--no-link` : pas de symlink `result` ; `--print-out-paths` : imprime le store path du
+// toplevel (= cible du nvd diff). `overrides` (optionnel) : liste { name, ref } d'inputs à
+// pointer sur leur amont via `--override-input` — évalue « comme si mis à jour » **sans
+// écrire flake.lock ni activer** (cf. DESIGN.md : aperçu de mise à jour, lecture seule).
+// Argv (path, host, refs restent des éléments distincts : pas de découpage shell).
+function buildToplevel(flakePath, host, overrides) {
+    var args = ["build", flakePath + "#nixosConfigurations." + host + ".config.system.build.toplevel", "--no-link", "--print-out-paths"];
+    var list = overrides || [];
+    // Aperçu de mise à jour : force la re-résolution du dernier amont (les refs
+    // github:owner/repo/branch sont sinon mis en cache par tarball-ttl → un correctif
+    // amont récent resterait invisible au « réessayer »).
+    if (list.length > 0)
+        args.push("--refresh");
+    for (var i = 0; i < list.length; i++)
+        args.push("--override-input", list[i].name, list[i].ref);
+    return args;
+}
+
+// nvd diff <current> <target> → aperçu texte des changements de closure. `current` défaut
+// `/run/current-system` (génération active). Argv pour la commande `nvd`.
+function nvdDiff(current, target) {
+    return ["diff", current || "/run/current-system", target];
+}
+
+// hostname → résout l'hôte courant quand il n'est pas configuré (clé de nixosConfigurations).
+function hostnameArgv() {
+    return ["hostname"];
+}

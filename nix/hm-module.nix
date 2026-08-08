@@ -25,8 +25,9 @@ in {
     # Le plugin est découvert par DMS dans ~/.config/DankMaterialShell/plugins/.
     xdg.configFile."DankMaterialShell/plugins/Noosphere".source = plugin;
 
-    # Deps runtime : nix (lit le flake local via `nix flake metadata`), curl (interroge le
-    # compare GitHub) et xdg-open (liens changelog, fourni par xdg-utils).
-    home.packages = [pkgs.nix pkgs.curl pkgs.xdg-utils];
+    # Deps runtime : nix (lit le flake local via `nix flake metadata` et build le toplevel
+    # à la demande), curl (compare GitHub), nvd (diff de closure) et xdg-open (liens
+    # changelog, fourni par xdg-utils).
+    home.packages = [pkgs.nix pkgs.curl pkgs.nvd pkgs.xdg-utils];
   };
 }

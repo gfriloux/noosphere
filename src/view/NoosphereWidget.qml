@@ -6,6 +6,7 @@ import qs.Common
 import qs.Widgets
 import qs.Modules.Plugins
 import "../model/format.js" as Format
+import "../query/queries.js" as Queries
 
 PluginComponent {
     id: root
@@ -17,6 +18,7 @@ PluginComponent {
     readonly property string cfgToken: (pluginData && pluginData.githubToken) ? pluginData.githubToken : ""
     readonly property string cfgApiBase: (pluginData && pluginData.apiBase) ? pluginData.apiBase : ""
     readonly property int cfgIntervalMs: (pluginData && pluginData.checkMinutes > 0) ? pluginData.checkMinutes * 60000 : 3600000
+    readonly property string cfgHost: (pluginData && pluginData.hostname) ? pluginData.hostname : ""
 
     // Couleur du badge : gris si le check a échoué (dernière valeur connue conservée),
     // sinon couleur de l'état de dérive.
@@ -29,6 +31,29 @@ PluginComponent {
         githubToken: root.cfgToken
         apiBase: root.cfgApiBase
         intervalMs: root.cfgIntervalMs
+    }
+
+    // Inputs en retard → overrides vers l'amont (aperçu de mise à jour, sans écrire le lock).
+    readonly property var closureOverrides: {
+        var out = [];
+        var ins = svc.inputs;
+        for (var i = 0; i < ins.length; i++) {
+            var it = ins[i];
+            if (it.type === "github" && typeof it.behind === "number" && it.behind > 0 && it.owner && it.head)
+                out.push({
+                    "name": it.name,
+                    "ref": Queries.githubFlakeRef(it.owner, it.repoName, it.head)
+                });
+        }
+        return out;
+    }
+
+    // Service de diff de closure (build à la demande, jamais automatique).
+    Closure {
+        id: closureSvc
+        flakePath: root.cfgFlakePath
+        host: root.cfgHost
+        overrides: root.closureOverrides
     }
 
     // ---- Pièce de barre : glyphe rosace + pastille compteur ----
@@ -70,13 +95,17 @@ PluginComponent {
     popoutContent: Component {
         Cockpit {
             service: svc
+            closureService: closureSvc
             owner: root
         }
     }
     popoutWidth: 480
     // Hauteur dérivée du contenu (calculée en amont, comme astropath/auspex : le popout est
     // dimensionné par le widget, jamais réécrit depuis le cockpit). padding 14×2 + carte
-    // en-tête (~87) + gaps 11×2 + carte inputs (28 + titre 20 + N lignes×33) + pied 36.
+    // en-tête (~87) + gaps 11×3 + carte inputs (28 + titre 20 + N×33) + carte closure + pied 36.
     readonly property int inputCount: svc.inputs.length
-    popoutHeight: 28 + 87 + 11 + (28 + 20 + Math.max(1, inputCount) * 33) + 11 + 36
+    readonly property int closureCount: (closureSvc.diff && closureSvc.diff.entries) ? closureSvc.diff.entries.length : 0
+    // Carte closure : ~ titre + (bouton|spinner|résumé+console) selon l'état.
+    readonly property int closureH: closureSvc.status === "ready" ? (28 + 20 + 9 + 20 + 9 + Math.min(closureCount * 21, 240) + 16 + 9 + 24) : (closureSvc.status === "error" ? (28 + 20 + 9 + 48 + 9 + 24) : (28 + 20 + 9 + 34))
+    popoutHeight: 28 + 87 + 11 + (28 + 20 + Math.max(1, inputCount) * 33) + 11 + closureH + 11 + 36
 }

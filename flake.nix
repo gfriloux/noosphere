@@ -49,9 +49,11 @@
             qt6.qtdeclarative # qmllint, qmlformat, qmltestrunner
             qt6.qtbase
 
-            # Runtime du service : lit le flake local (nix) + interroge l'amont GitHub (curl)
+            # Runtime du service : lit le flake local (nix) + interroge l'amont GitHub (curl) ;
+            # nvd calcule le diff de closure (build à la demande, cf. DESIGN.md)
             nix
             curl
+            nvd
 
             # Dev : mock du compare GitHub (just mock) + instance DMS isolée (just dev-bar)
             python3

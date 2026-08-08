@@ -17,6 +17,7 @@ PopoutComponent {
     id: cockpit
 
     property var service
+    property var closureService
     property var owner
 
     // En-tête par défaut de PopoutComponent masqué : on porte nos propres cartes.
@@ -384,6 +385,12 @@ PopoutComponent {
                         }
                     }
                 }
+            }
+
+            // ============ Carte DIFF DE CLOSURE ============
+            ClosureCard {
+                width: parent.width
+                service: cockpit.closureService
             }
 
             // ============ Pied : cadence + check maintenant (lecture seule) ============
