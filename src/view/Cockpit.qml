@@ -34,13 +34,6 @@ PopoutComponent {
         onTriggered: cockpit.now = Date.now() / 1000
     }
 
-    // Ajuste la hauteur du popout au contenu (padding 14 en haut + en bas).
-    Binding {
-        target: cockpit.owner
-        property: "popoutHeight"
-        value: outer.implicitHeight + 28
-    }
-
     Column {
         id: outer
         anchors.left: parent.left
