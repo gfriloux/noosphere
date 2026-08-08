@@ -62,6 +62,8 @@ PopoutComponent {
                     anchors.left: parent.left
                     anchors.top: parent.top
                     anchors.bottom: parent.bottom
+                    anchors.topMargin: 13
+                    anchors.bottomMargin: 13
                     width: 3
                     radius: 1.5
                     color: "#89b4fa"
@@ -191,6 +193,8 @@ PopoutComponent {
                     anchors.left: parent.left
                     anchors.top: parent.top
                     anchors.bottom: parent.bottom
+                    anchors.topMargin: 13
+                    anchors.bottomMargin: 13
                     width: 3
                     radius: 1.5
                     color: cockpit.isError ? "#f38ba8" : "#f9e2af"
@@ -322,14 +326,14 @@ PopoutComponent {
                                         color: "#6c7086"
                                     }
                                 }
+                                // Âge de lock élastique + élidable : absorbe le manque de place
+                                // (noms longs, gros compteurs) et pousse le retard à droite.
                                 StyledText {
+                                    Layout.fillWidth: true
+                                    elide: Text.ElideRight
                                     text: "lock " + Format.relativeAge(row.modelData.lockedAt, cockpit.now)
                                     font.pixelSize: Theme.fontSizeSmall
                                     color: "#6c7086"
-                                }
-
-                                Item {
-                                    Layout.fillWidth: true
                                 }
 
                                 // Lien changelog (lecture seule) : révélé au survol d'une ligne en retard.
@@ -366,10 +370,10 @@ PopoutComponent {
                                     }
                                 }
 
-                                // Texte de retard, aligné à droite, largeur fixe.
+                                // Texte de retard, une seule ligne (largeur contenu), à droite.
                                 StyledText {
-                                    Layout.preferredWidth: 104
-                                    horizontalAlignment: Text.AlignRight
+                                    Layout.alignment: Qt.AlignVCenter
+                                    wrapMode: Text.NoWrap
                                     text: Format.behindLabel(row.modelData.behind)
                                     font.family: Theme.defaultMonoFontFamily
                                     font.pixelSize: Theme.fontSizeSmall

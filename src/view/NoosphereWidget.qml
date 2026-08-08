@@ -73,7 +73,7 @@ PluginComponent {
             owner: root
         }
     }
-    popoutWidth: 440
+    popoutWidth: 480
     // Hauteur dérivée du contenu (calculée en amont, comme astropath/auspex : le popout est
     // dimensionné par le widget, jamais réécrit depuis le cockpit). padding 14×2 + carte
     // en-tête (~87) + gaps 11×2 + carte inputs (28 + titre 20 + N lignes×33) + pied 36.
