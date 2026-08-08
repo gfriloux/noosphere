@@ -106,6 +106,6 @@ PluginComponent {
     readonly property int inputCount: svc.inputs.length
     readonly property int closureCount: (closureSvc.diff && closureSvc.diff.entries) ? closureSvc.diff.entries.length : 0
     // Carte closure : ~ titre + (bouton|spinner|résumé+console) selon l'état.
-    readonly property int closureH: closureSvc.status === "ready" ? (28 + 20 + 9 + 20 + 9 + Math.min(closureCount * 21, 240) + 16 + 9 + 24) : (28 + 20 + 9 + 34)
+    readonly property int closureH: closureSvc.status === "ready" ? (28 + 20 + 9 + 20 + 9 + Math.min(closureCount * 21, 240) + 16 + 9 + 24) : (closureSvc.status === "error" ? (28 + 20 + 9 + 48 + 9 + 24) : (28 + 20 + 9 + 34))
     popoutHeight: 28 + 87 + 11 + (28 + 20 + Math.max(1, inputCount) * 33) + 11 + closureH + 11 + 36
 }

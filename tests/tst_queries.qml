@@ -52,7 +52,7 @@ TestCase {
                 "name": "home-manager",
                 "ref": "github:nix-community/home-manager/master"
             }
-        ]), ["build", "/etc/nixos#nixosConfigurations.host.config.system.build.toplevel", "--no-link", "--print-out-paths", "--override-input", "nixpkgs", "github:nixos/nixpkgs/nixos-unstable", "--override-input", "home-manager", "github:nix-community/home-manager/master"]);
+        ]), ["build", "/etc/nixos#nixosConfigurations.host.config.system.build.toplevel", "--no-link", "--print-out-paths", "--refresh", "--override-input", "nixpkgs", "github:nixos/nixpkgs/nixos-unstable", "--override-input", "home-manager", "github:nix-community/home-manager/master"]);
     }
 
     function test_githubFlakeRef() {

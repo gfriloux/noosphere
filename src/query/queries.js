@@ -54,6 +54,11 @@ function githubFlakeRef(owner, repo, ref) {
 function buildToplevel(flakePath, host, overrides) {
     var args = ["build", flakePath + "#nixosConfigurations." + host + ".config.system.build.toplevel", "--no-link", "--print-out-paths"];
     var list = overrides || [];
+    // Aperçu de mise à jour : force la re-résolution du dernier amont (les refs
+    // github:owner/repo/branch sont sinon mis en cache par tarball-ttl → un correctif
+    // amont récent resterait invisible au « réessayer »).
+    if (list.length > 0)
+        args.push("--refresh");
     for (var i = 0; i < list.length; i++)
         args.push("--override-input", list[i].name, list[i].ref);
     return args;

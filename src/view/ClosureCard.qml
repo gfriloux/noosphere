@@ -173,7 +173,7 @@ Rectangle {
             }
         }
 
-        // --- error : message ---
+        // --- error : message + réessayer ---
         StyledText {
             visible: card.isError
             width: parent.width
@@ -182,6 +182,42 @@ Rectangle {
             font.family: Theme.defaultMonoFontFamily
             font.pixelSize: Theme.fontSizeSmall
             color: "#f38ba8"
+        }
+        Rectangle {
+            visible: card.isError
+            width: retryRow.implicitWidth + 20
+            height: 24
+            radius: 7
+            color: retryArea.containsMouse ? "#1e1e2e" : "transparent"
+            border.width: 1
+            border.color: retryArea.containsMouse ? "#f38ba8" : "#45475a"
+
+            Row {
+                id: retryRow
+                anchors.centerIn: parent
+                spacing: 5
+
+                DankIcon {
+                    anchors.verticalCenter: parent.verticalCenter
+                    name: "refresh"
+                    size: Theme.fontSizeSmall
+                    color: "#f38ba8"
+                }
+                StyledText {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "réessayer"
+                    font.pixelSize: Theme.fontSizeSmall
+                    color: "#f38ba8"
+                }
+            }
+            MouseArea {
+                id: retryArea
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: if (card.service)
+                    card.service.preview()
+            }
         }
 
         // --- ready : résumé + console ---
