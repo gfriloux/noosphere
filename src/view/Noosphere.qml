@@ -43,21 +43,21 @@ QtObject {
 
     // --- État interne du driver séquentiel ---
     //
-    // Contrat : **une étape = une requête = une avance**. L'input est capturé dans `_current`
-    // au moment où la requête part ; les handlers ne relisent jamais `_queue[_cursor]`, sans
-    // quoi une réponse arrivant après une avance serait attribuée au voisin (qui afficherait
-    // alors un retard sans head : invisible pour l'aperçu de closure et le lien changelog).
-    // `_await` dit ce qu'on attend : tout ce qui ne correspond pas est ignoré, ce qui empêche
-    // une étape d'avancer deux fois — cas restant depuis le passage en XHR : le watchdog a
-    // déclaré l'étape perdue et avancé, puis la réponse arrive quand même.
+    // Contrat : **une étape = une requête = une avance**. L'input est porté par la closure de
+    // sa requête : une réponse ne peut pas être attribuée au voisin (qui afficherait alors un
+    // retard sans head : invisible pour l'aperçu de closure et le lien changelog). Et une
+    // requête abandonnée ne rappelle jamais — `_abortPending()` la clôt avant `abort()` —
+    // donc une étape ne peut pas avancer deux fois.
+    //
+    // Ce rattachement était auparavant gardé par un état partagé (`_await` / `_current`),
+    // rendu nécessaire par deux `Process` `curl` réutilisés pour N inputs. Émettre une
+    // requête par objet le rend structurel : il n'y a plus rien à garder.
     property var _inputs: [] // inputs bruts (parseMetadata), avant retard
     property var _behind: ({}) // accumulateur name → behind
     property var _heads: ({}) // accumulateur name → head amont résolu (pour le lien changelog)
     property var _queue: [] // inputs github à comparer
     property int _cursor: 0
     property bool _busy: false
-    property var _current: null // input de l'étape en cours (capturé à l'émission)
-    property string _await: "" // ce qu'on attend : "" | "repo" | "compare"
     property var _pending: null // requête HTTP en vol (une seule à la fois) : { xhr, timedOut, settled }
 
     // (Re)poll quand un réglage pertinent change.
@@ -98,9 +98,10 @@ QtObject {
         onTriggered: {
             if (!root._busy)
                 return;
-            if (root._await.length > 0) {
-                root._await = "";
-                root._abortPending(); // sinon sa réponse tardive ferait avancer l'étape suivante
+            // Une requête en vol = on est dans une étape HTTP : on la déclare perdue et on
+            // passe au suivant. Sinon l'étape bloquée est `nix`, et le poll entier échoue.
+            if (root._pending) {
+                root._abortPending();
                 root._advance();
             } else {
                 root._fail("check interrompu (délai dépassé)");
@@ -216,50 +217,37 @@ QtObject {
     // ---- Driver séquentiel des compare ----
 
     function _next() {
-        root._await = "";
-        root._current = null;
         if (root._cursor >= root._queue.length) {
             root._commit();
             return;
         }
         var it = root._queue[root._cursor];
-        root._current = it;
         if (it.channel) {
             root._compare(it, it.channel);
-        } else {
-            // Pas de ref suivie → résoudre la branche par défaut du repo d'abord.
-            root._await = "repo";
-            stepWatchdog.restart();
-            root._ghGet(Queries.repoApiUrl(root.apiBase, it.owner, it.repoName), function (status, text, timedOut) {
-                if (root._await !== "repo")
-                    return; // réponse d'une étape déjà close : elle ne nous concerne plus
-                var cur = root._current;
-                root._await = "";
-                var err = Model.githubError(status, text, timedOut);
-                if (err && err.fatal) {
-                    root._fail(err.message); // vaut pour toutes les requêtes suivantes
-                    return;
-                }
-                var res = err ? null : root._parse(text);
-                // La réponse doit désigner le dépôt interrogé, sinon elle vient d'ailleurs.
-                var head = Model.repoBelongsTo(res, cur.owner, cur.repoName) ? Model.parseDefaultBranch(res) : "";
-                if (head)
-                    root._compare(cur, head);
-                else
-                    root._advance(); // non résolu → behind reste indéterminé
-            });
+            return;
         }
+        // Pas de ref suivie → résoudre la branche par défaut du repo d'abord.
+        stepWatchdog.restart();
+        root._ghGet(Queries.repoApiUrl(root.apiBase, it.owner, it.repoName), function (status, text, timedOut) {
+            var err = Model.githubError(status, text, timedOut);
+            if (err && err.fatal) {
+                root._fail(err.message); // vaut pour toutes les requêtes suivantes
+                return;
+            }
+            var res = err ? null : root._parse(text);
+            // La réponse doit désigner le dépôt interrogé, sinon elle vient d'ailleurs.
+            var head = Model.repoBelongsTo(res, it.owner, it.repoName) ? Model.parseDefaultBranch(res) : "";
+            if (head)
+                root._compare(it, head);
+            else
+                root._advance(); // non résolu → behind reste indéterminé
+        });
     }
 
     function _compare(it, head) {
         root._heads[it.name] = head; // mémorisé pour le lien changelog de la vue
-        root._await = "compare";
         stepWatchdog.restart();
         root._ghGet(Queries.compareApiUrl(root.apiBase, it.owner, it.repoName, it.lockRev, head), function (status, text, timedOut) {
-            if (root._await !== "compare")
-                return;
-            var cur = root._current;
-            root._await = "";
             var err = Model.githubError(status, text, timedOut);
             if (err && err.fatal) {
                 root._fail(err.message);
@@ -267,10 +255,10 @@ QtObject {
             }
             var res = err ? null : root._parse(text);
             // La réponse doit porter sur la révision verrouillée de CET input.
-            if (Model.compareBelongsTo(res, cur.lockRev)) {
+            if (Model.compareBelongsTo(res, it.lockRev)) {
                 var b = Model.parseCompare(res);
                 if (typeof b === "number")
-                    root._behind[cur.name] = b;
+                    root._behind[it.name] = b;
             }
             root._advance();
         });
@@ -285,8 +273,6 @@ QtObject {
 
     function _commit() {
         stepWatchdog.stop();
-        root._await = "";
-        root._current = null;
         var list = Model.mergeBehind(root._inputs, root._behind);
         // Enrichit chaque input du head amont résolu (channel ou branche par défaut) : sert
         // au lien changelog de la vue. Hors modèle golden (dépend de la résolution réseau).
@@ -305,9 +291,10 @@ QtObject {
         root._busy = false;
     }
 
-    // Abandonne la requête en vol, s'il y en a une : sans cela, une réponse tardive resterait
-    // à courir pendant le poll suivant (le garde `_await` l'ignorerait, mais autant ne pas la
-    // laisser vivre) et `httpTimeout` viendrait interrompre la requête d'après.
+    // Abandonne la requête en vol, s'il y en a une. Elle est marquée close **avant** `abort()`
+    // pour que son rappel ne parte pas : c'est ce qui garantit qu'une réponse tardive ne fera
+    // jamais avancer l'étape suivante. Sans cela, `httpTimeout` viendrait de surcroît
+    // interrompre la requête d'après.
     function _abortPending() {
         var p = root._pending;
         root._pending = null;
@@ -323,8 +310,6 @@ QtObject {
     function _fail(msg) {
         stepWatchdog.stop();
         root._abortPending();
-        root._await = "";
-        root._current = null;
         root.connectionStatus = "error";
         root.errorMessage = msg;
         root._busy = false;
