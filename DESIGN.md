@@ -67,8 +67,8 @@ Construit l'**argv** de `nix flake metadata --json` et l'**URL** de l'API compar
 GitHub — des fonctions **pures**, **sans aucun secret**. On retourne un **tableau
 d'arguments** (jamais une ligne shell : pas d'injection, la requête reste un élément), et
 une URL construite à partir de `owner/repo/base/head`. Ne connaît ni le réseau ni la
-présentation. L'exécution (Process `nix`, `POST`/`GET` `curl`) est le travail du
-**service** (`Noosphere.qml`), pas de cette couche.
+présentation. L'exécution (Process `nix`, `GET` HTTP émis par le processus lui-même) est le
+travail du **service** (`Noosphere.qml`), pas de cette couche.
 
 > **L'auth vit dans un header, pas dans l'URL.** Le token GitHub (optionnel, pour lever la
 > limite de 60 req/h) passe par le header HTTP `Authorization: Bearer <token>`, injecté par
@@ -102,7 +102,8 @@ installé dans `~/.config/DankMaterialShell/plugins/Noosphere/`. Il hérite du t
 
 - `query` → `src/query/queries.js` : `flakeMetadata()` / `compareApiUrl()` / `repoApiUrl()`
   (dérive), `buildToplevel()` / `nvdDiff()` / `hostnameArgv()` (diff de closure), fonctions
-  pures. Exécutées par les services (Process `nix`, `curl`, `nvd`).
+  pures. Exécutées par les services (Process `nix` et `nvd` ; les URLs GitHub sont
+  interrogées par `XMLHttpRequest`, sans processus externe).
 - `model` → `src/model/inputs.js` (dérive : `parseMetadata`, `parseCompare`, `mergeBehind`,
   `behindCount`, `barState`, rattachement des réponses : `compareBelongsTo`, `repoBelongsTo`)
   + `src/model/closure.js` (`parseNvdDiff`, `closureSeverity`,
