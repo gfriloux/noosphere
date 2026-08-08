@@ -37,8 +37,26 @@ TestCase {
     // --- Diff de closure (v0.2.0) ---
 
     // Le path et le host restent des éléments argv distincts (pas de découpage shell).
-    function test_buildToplevel() {
-        eq(Q.buildToplevel("/etc/nixos", "kuri-desktop"), ["build", "/etc/nixos#nixosConfigurations.kuri-desktop.config.system.build.toplevel", "--no-link", "--print-out-paths"]);
+    function test_buildToplevel_plain() {
+        eq(Q.buildToplevel("/etc/nixos", "kuri-desktop", []), ["build", "/etc/nixos#nixosConfigurations.kuri-desktop.config.system.build.toplevel", "--no-link", "--print-out-paths"]);
+    }
+
+    // Aperçu de mise à jour : chaque input en retard devient un --override-input vers l'amont.
+    function test_buildToplevel_overrides() {
+        eq(Q.buildToplevel("/etc/nixos", "host", [
+            {
+                "name": "nixpkgs",
+                "ref": "github:nixos/nixpkgs/nixos-unstable"
+            },
+            {
+                "name": "home-manager",
+                "ref": "github:nix-community/home-manager/master"
+            }
+        ]), ["build", "/etc/nixos#nixosConfigurations.host.config.system.build.toplevel", "--no-link", "--print-out-paths", "--override-input", "nixpkgs", "github:nixos/nixpkgs/nixos-unstable", "--override-input", "home-manager", "github:nix-community/home-manager/master"]);
+    }
+
+    function test_githubFlakeRef() {
+        eq(Q.githubFlakeRef("nixos", "nixpkgs", "nixos-unstable"), "github:nixos/nixpkgs/nixos-unstable");
     }
 
     function test_nvdDiff_default() {
