@@ -117,6 +117,58 @@ TestCase {
         }, "", "stc"), false);
     }
 
+    // ---- githubError : statut HTTP → cause nommée ----
+    //
+    // `fatal` dit si la cause vaut pour toutes les requêtes suivantes (inutile de marteler
+    // l'API : le poll s'arrête) ou si elle ne concerne que cet input (on avance).
+
+    function test_githubError_ok() {
+        compare(Model.githubError(200, "{}", false), null);
+        compare(Model.githubError(204, "", false), null);
+    }
+    function test_githubError_rateLimit() {
+        var e = Model.githubError(403, '{"message": "API rate limit exceeded for 1.2.3.4."}', false);
+        compare(e.fatal, true);
+        verify(e.message.indexOf("limite") >= 0);
+        // 429 : limite secondaire, même conduite quel que soit le corps.
+        compare(Model.githubError(429, "{}", false).fatal, true);
+    }
+    function test_githubError_forbiddenSansLimite() {
+        // Un 403 qui n'est pas une limite de débit ne doit pas être annoncé comme telle.
+        var e = Model.githubError(403, '{"message": "Resource not accessible"}', false);
+        compare(e.fatal, true);
+        compare(e.message.indexOf("limite"), -1);
+    }
+    function test_githubError_token() {
+        var e = Model.githubError(401, '{"message": "Bad credentials"}', false);
+        compare(e.fatal, true);
+        verify(e.message.indexOf("token") >= 0);
+    }
+    function test_githubError_notFound() {
+        // Propre à un input : les autres restent comparables.
+        var e = Model.githubError(404, '{"message": "Not Found"}', false);
+        compare(e.fatal, false);
+    }
+    function test_githubError_serveur() {
+        compare(Model.githubError(500, "", false).fatal, false);
+        compare(Model.githubError(503, "", false).fatal, false);
+    }
+    function test_githubError_transport() {
+        // status 0 couvre deux causes distinctes, que seul le drapeau sépare.
+        var timeout = Model.githubError(0, "", true);
+        var reseau = Model.githubError(0, "", false);
+        compare(timeout.fatal, false);
+        compare(reseau.fatal, false);
+        verify(timeout.message !== reseau.message);
+        verify(timeout.message.indexOf("délai") >= 0);
+    }
+    function test_githubError_corpsIllisible() {
+        // Un corps non-JSON ne doit pas faire échouer la traduction.
+        var e = Model.githubError(403, "<html>gateway</html>", false);
+        compare(e.fatal, true);
+        verify(e.message.length > 0);
+    }
+
     function test_upstreamRef() {
         compare(Model.upstreamRef({
             "channel": "nixos-unstable"

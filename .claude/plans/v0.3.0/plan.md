@@ -101,21 +101,27 @@ rien d'autre. Doc `DESIGN.md` (l.70, l.105) et `CLAUDE.md` (l.21) dans le même 
 
 #### Étape 2 : test de la traduction d'une erreur d'API
 **Description :** ajouter dans `tests/tst_model.qml` la couverture de
-`githubErrorMessage(status, body, aborted)` : chaîne vide si 2xx ; message dédié pour 401
+`githubError(status, body, timedOut)` : `null` si 2xx ; sinon `{ message, fatal }` — 401
 (token refusé), 403/429 rate-limit (distingué d'un 403 ordinaire par le corps), 404
-(dépôt introuvable), 5xx (GitHub indisponible), `status = 0` avec et sans `aborted`
-(délai dépassé / réseau injoignable). Le test échoue (fonction absente).
-**Vérification :** `just test` échoue sur `test_githubErrorMessage*`
+(dépôt introuvable), 5xx (GitHub indisponible), `status = 0` avec et sans `timedOut`
+(délai dépassé / réseau injoignable), corps non-JSON. Le test échoue (fonction absente).
+
+> Ajustement en cours de route : le plan prévoyait `githubErrorMessage()` rendant une
+> chaîne. Le service a besoin de deux informations — quoi dire, et faut-il arrêter le poll.
+> Les déduire deux fois du même corps serait redondant, d'où un objet `{ message, fatal }`
+> et un nom qui ne ment plus sur ce qui est rendu.
+
+**Vérification :** `just test` échoue sur `test_githubError*`
 **Commit :** `test(model): couvrir la traduction des erreurs de l'API GitHub`
 
 #### Étape 3 : les erreurs GitHub deviennent lisibles
-**Description :** implémenter `githubErrorMessage()` dans `src/model/inputs.js` (pure,
-documentée comme ses voisines) et l'utiliser dans le service. Règle d'usage, explicite :
+**Description :** implémenter `githubError()` dans `src/model/inputs.js` (pure, documentée
+comme ses voisines) et l'utiliser dans le service. Règle d'usage, explicite :
 
-| Cas | Conduite |
-|---|---|
-| 401, 403 rate-limit, 429 | `_fail(message)` — la cause vaut pour toutes les requêtes suivantes, inutile de marteler l'API ; dernier état conservé (inv. 7) |
-| 404, 5xx, réseau, délai dépassé | input laissé en retard indéterminé, on avance |
+| Cas | `fatal` | Conduite |
+|---|---|---|
+| 401, 403 (limite ou non), 429 | oui | `_fail(message)` — la cause vaut pour toutes les requêtes suivantes, inutile de marteler l'API ; dernier état conservé (inv. 7) |
+| 404, 5xx, réseau, délai dépassé | non | input laissé en retard indéterminé, on avance |
 
 **Vérification :** `just ci` + `manual_tests.md` §3
 **Commit :** `feat(view): nommer la cause d'un échec d'appel GitHub`
