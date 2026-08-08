@@ -1,0 +1,62 @@
+# Configuration git-cliff — changelog depuis les Conventional Commits.
+# Régénérer avec `just changelog` (relire le diff). Groupes en français, alignés sur les
+# types de commits du dépôt (cf. PROCEDURE_PLANS.md §3).
+
+[remote.github]
+owner = "gfriloux"
+repo = "noosphere"
+
+[changelog]
+header = """
+# Changelog
+
+Toutes les évolutions notables de noosphere. Format inspiré de [Keep a Changelog],
+versions en [SemVer]. Généré depuis les Conventional Commits par git-cliff.
+
+[Keep a Changelog]: https://keepachangelog.com/fr/1.1.0/
+[SemVer]: https://semver.org/lang/fr/
+
+"""
+
+body = """
+{% if version %}\
+    ## [{{ version | trim_start_matches(pat="v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}
+{% else %}\
+    ## [Non publié]
+{% endif %}\
+{% for group, commits in commits | group_by(attribute="group") %}
+    ### {{ group | striptags | trim | upper_first }}
+    {% for commit in commits %}
+        - {% if commit.scope %}**{{ commit.scope }}** : {% endif %}\
+            {{ commit.message | split(pat="\n") | first | upper_first }}\
+    {% endfor %}
+{% endfor %}\n
+"""
+
+footer = """
+<!-- généré par git-cliff -->
+"""
+
+trim = true
+
+[git]
+conventional_commits = true
+filter_unconventional = true
+split_commits = false
+# Ne garde que les commits qui matchent un parser (protège le changelog du bruit).
+filter_commits = true
+tag_pattern = "v[0-9]*"
+sort_commits = "newest"
+
+commit_parsers = [
+  { message = "^feat", group = "<!-- 0 -->Fonctionnalités" },
+  { message = "^fix", group = "<!-- 1 -->Corrections" },
+  { message = "^perf", group = "<!-- 2 -->Performance" },
+  { message = "^refactor", group = "<!-- 3 -->Refactorisations" },
+  { message = "^docs", group = "<!-- 4 -->Documentation" },
+  { message = "^test", group = "<!-- 5 -->Tests" },
+  { message = "^ci", group = "<!-- 6 -->Intégration continue" },
+  { message = "^chore", group = "<!-- 7 -->Divers" },
+  { message = "^merge", skip = true },
+  { message = ".*", skip = true },
+]

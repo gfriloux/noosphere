@@ -38,10 +38,12 @@ Enrichi au fil du dev, exécuté en validation.
       dans le navigateur par défaut.
 
 ### États annexes
-- [ ] Pendant un check : colonnes « retard » en placeholder gris, liste non vidée.
-- [ ] Échec fetch (mock scenario `error`/`ratelimit`) : liseré carte inputs rouge, ligne
-      de statut « échec du check · réessayer », badge garde la dernière valeur (gris).
-- [ ] Inputs non-GitHub (ex. `type != github`) : affichés, jamais comparés (pas de retard).
+- [ ] Pendant un check : le badge conserve la dernière valeur (liste non vidée).
+- [ ] **Échec GitHub** (mock scenario `ratelimit`/`error`) : dégradation *silencieuse* —
+      les inputs comparés affichent « — » (retard indéterminé), le badge garde sa valeur.
+- [ ] **Échec flake** (chemin invalide → `nix` en erreur) : liseré carte INPUTS rouge,
+      ligne « échec du check · réessayer », badge en gris.
+- [ ] Inputs non-GitHub (ex. `type != github`) : affichés, jamais comparés (« — »).
 
 ## Résultats
 
