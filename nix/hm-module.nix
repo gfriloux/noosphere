@@ -26,8 +26,9 @@ in {
     xdg.configFile."DankMaterialShell/plugins/Noosphere".source = plugin;
 
     # Deps runtime : nix (lit le flake local via `nix flake metadata` et build le toplevel
-    # à la demande), curl (compare GitHub), nvd (diff de closure) et xdg-open (liens
-    # changelog, fourni par xdg-utils).
-    home.packages = [pkgs.nix pkgs.curl pkgs.nvd pkgs.xdg-utils];
+    # à la demande), nvd (diff de closure) et xdg-open (liens changelog, fourni par
+    # xdg-utils). L'amont GitHub est interrogé par le service lui-même : aucun client HTTP
+    # externe n'est requis.
+    home.packages = [pkgs.nix pkgs.nvd pkgs.xdg-utils];
   };
 }

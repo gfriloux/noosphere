@@ -120,7 +120,7 @@ noosphere is **read-only as far as the system is concerned**: the token needs no
 access, nothing is ever written to the flake, and no build is ever **activated**. The only
 possible side effect is an **on-demand** `nix build` (the *prévisualiser la mise à jour*
 button) that builds/downloads derivations without ever switching the system. Runtime
-dependencies declared by the module: `nix`, `curl`, `nvd`, `xdg-utils`.
+dependencies declared by the module: `nix`, `nvd`, `xdg-utils`.
 
 ## Release
 

@@ -9,6 +9,6 @@
   "component": "./src/view/NoosphereWidget.qml",
   "settings": "./src/view/Settings.qml",
   "icon": "sync",
-  "requires": ["nix", "curl", "nvd", "xdg-open"],
+  "requires": ["nix", "nvd", "xdg-open"],
   "permissions": ["process", "settings_read", "settings_write"]
 }
