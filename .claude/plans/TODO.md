@@ -45,6 +45,36 @@ manuels, faute de mieux.
 
 ---
 
+## Passer `cliff.toml` en anglais
+
+**Repéré :** 2026-08-08, après la décision d'écrire les messages de commit en anglais.
+
+Les messages de commit sont désormais rédigés en **anglais**. Tout ce que `cliff.toml`
+ajoute autour reste en français, donc le `CHANGELOG.md` sortira panaché.
+
+À traduire dans `cliff.toml` :
+
+| Élément | Aujourd'hui |
+|---|---|
+| `[changelog] header` | « Toutes les évolutions notables… », liens `keepachangelog.com/fr/`, `semver.org/lang/fr/` |
+| `body`, section sans tag | `## [Non publié]` |
+| `body`, séparateur de scope | `- **{{ scope }}** : ` (espace avant `:`, typographie française) |
+| `footer` | `<!-- généré par git-cliff -->` |
+| `commit_parsers`, noms de groupes | Fonctionnalités, Corrections, Performance, Refactorisations, Documentation, Tests, Intégration continue, Divers |
+
+**Les sections déjà publiées restent en français** : elles décrivent des commits français,
+les réécrire serait un mensonge rétroactif. Le fichier sera donc bilingue par construction,
+coupé net à la première version postérieure au changement — c'est le comportement voulu,
+pas un défaut à corriger.
+
+Conséquence à vérifier au moment de le faire : `just changelog` régénère **tout** le fichier
+depuis l'historique. Traduire `cliff.toml` seul retraduirait donc aussi les vieilles
+sections en en-têtes anglais (les titres de commits, eux, resteraient français). Deux
+sorties possibles — figer l'historique déjà publié en tête de fichier et ne générer que le
+neuf, ou accepter des en-têtes anglais au-dessus de titres français. À trancher là-bas.
+
+---
+
 ## Un poll où *tout* échoue finit quand même en vert
 
 **Repéré :** 2026-08-08, validation de v0.3.0. **Antérieur au plan** (même conduite avec
