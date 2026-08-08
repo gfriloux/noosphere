@@ -8,6 +8,26 @@ versions en [SemVer]. Généré depuis les Conventional Commits par git-cliff.
 
 ## [Non publié]
 
+### Corrections
+
+- **view** : Distinguer « aucun retard » de « retard non prévisualisable »
+- **view** : Garantir la sortie de l'état occupé du poll
+- **view** : Attribuer chaque réponse GitHub à l'input qui l'a demandée
+- **model** : Rejeter aussi une réponse repo d'un autre input
+- **model** : Rejeter une réponse compare qui n'appartient pas à l'input attendu
+
+### Documentation
+
+- Consigner le contrat du driver de poll et l'interdit de se contredire
+- **plan** : Planifier v0.2.1 (driver de poll + carte closure honnête)
+- **readme** : Passe le README en anglais
+
+### Tests
+
+- **model** : Reproduire l'attribution d'une réponse compare au mauvais input
+
+## [0.2.0] - 2026-08-08
+
 ### Fonctionnalités
 
 - **view** : Closure = aperçu de mise à jour (sans muter)
@@ -17,8 +37,13 @@ versions en [SemVer]. Généré depuis les Conventional Commits par git-cliff.
 - **model** : Parse nvd diff + heuristique de sévérité
 - **query** : Build toplevel + nvd diff (diff de closure)
 
+### Corrections
+
+- **view** : Bouton réessayer en erreur + --refresh sur l'aperçu
+
 ### Documentation
 
+- Régénère le changelog (aperçu de mise à jour)
 - État v0.2.0, structure et changelog
 - Cadre la carte diff de closure (build à la demande)
 
