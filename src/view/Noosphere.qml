@@ -230,12 +230,17 @@ QtObject {
             // Pas de ref suivie → résoudre la branche par défaut du repo d'abord.
             root._await = "repo";
             stepWatchdog.restart();
-            root._ghGet(Queries.repoApiUrl(root.apiBase, it.owner, it.repoName), function (status, text) {
+            root._ghGet(Queries.repoApiUrl(root.apiBase, it.owner, it.repoName), function (status, text, timedOut) {
                 if (root._await !== "repo")
                     return; // réponse d'une étape déjà close : elle ne nous concerne plus
                 var cur = root._current;
                 root._await = "";
-                var res = status === 200 ? root._parse(text) : null;
+                var err = Model.githubError(status, text, timedOut);
+                if (err && err.fatal) {
+                    root._fail(err.message); // vaut pour toutes les requêtes suivantes
+                    return;
+                }
+                var res = err ? null : root._parse(text);
                 // La réponse doit désigner le dépôt interrogé, sinon elle vient d'ailleurs.
                 var head = Model.repoBelongsTo(res, cur.owner, cur.repoName) ? Model.parseDefaultBranch(res) : "";
                 if (head)
@@ -250,12 +255,17 @@ QtObject {
         root._heads[it.name] = head; // mémorisé pour le lien changelog de la vue
         root._await = "compare";
         stepWatchdog.restart();
-        root._ghGet(Queries.compareApiUrl(root.apiBase, it.owner, it.repoName, it.lockRev, head), function (status, text) {
+        root._ghGet(Queries.compareApiUrl(root.apiBase, it.owner, it.repoName, it.lockRev, head), function (status, text, timedOut) {
             if (root._await !== "compare")
                 return;
             var cur = root._current;
             root._await = "";
-            var res = status === 200 ? root._parse(text) : null;
+            var err = Model.githubError(status, text, timedOut);
+            if (err && err.fatal) {
+                root._fail(err.message);
+                return;
+            }
+            var res = err ? null : root._parse(text);
             // La réponse doit porter sur la révision verrouillée de CET input.
             if (Model.compareBelongsTo(res, cur.lockRev)) {
                 var b = Model.parseCompare(res);
