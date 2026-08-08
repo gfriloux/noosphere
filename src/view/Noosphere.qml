@@ -41,12 +41,21 @@ QtObject {
     readonly property bool configured: flakePath.length > 0
 
     // --- État interne du driver séquentiel ---
+    //
+    // Contrat : **une étape = une requête = une avance**. L'input est capturé dans `_current`
+    // au moment où la requête part ; les handlers ne relisent jamais `_queue[_cursor]`, sans
+    // quoi une réponse arrivant après une avance serait attribuée au voisin (qui afficherait
+    // alors un retard sans head : invisible pour l'aperçu de closure et le lien changelog).
+    // `_await` dit ce qu'on attend : tout ce qui ne correspond pas est ignoré, ce qui empêche
+    // une étape d'avancer deux fois (`onExited` et `onStreamFinished` sont tous deux émis).
     property var _inputs: [] // inputs bruts (parseMetadata), avant retard
     property var _behind: ({}) // accumulateur name → behind
     property var _heads: ({}) // accumulateur name → head amont résolu (pour le lien changelog)
     property var _queue: [] // inputs github à comparer
     property int _cursor: 0
     property bool _busy: false
+    property var _current: null // input de l'étape en cours (capturé à l'émission)
+    property string _await: "" // ce qu'on attend : "" | "repo" | "compare"
 
     // (Re)poll quand un réglage pertinent change.
     function reconfigure() {
@@ -75,8 +84,10 @@ QtObject {
     }
 
     // Argv curl pour un GET d'API GitHub (JSON). Le token, s'il existe, va en header.
+    // `--max-time 20` : un compare sur un dépôt très en retard renvoie jusqu'à 250 commits,
+    // 10 s était atteignable et nous faisait abandonner nos propres requêtes.
     function _ghGet(url) {
-        var cmd = ["curl", "-s", "--max-time", "10", "-H", "Accept: application/vnd.github+json", "-H", "X-GitHub-Api-Version: 2022-11-28", "-H", "User-Agent: noosphere"];
+        var cmd = ["curl", "-s", "--max-time", "20", "-H", "Accept: application/vnd.github+json", "-H", "X-GitHub-Api-Version: 2022-11-28", "-H", "User-Agent: noosphere"];
         if (root.githubToken.length > 0)
             cmd.push("-H", "Authorization: Bearer " + root.githubToken);
         cmd.push(url);
@@ -121,15 +132,19 @@ QtObject {
     // ---- Driver séquentiel des compare ----
 
     function _next() {
+        root._await = "";
+        root._current = null;
         if (root._cursor >= root._queue.length) {
             root._commit();
             return;
         }
         var it = root._queue[root._cursor];
+        root._current = it;
         if (it.channel) {
             root._compare(it, it.channel);
         } else {
             // Pas de ref suivie → résoudre la branche par défaut du repo d'abord.
+            root._await = "repo";
             repoProc.command = root._ghGet(Queries.repoApiUrl(root.apiBase, it.owner, it.repoName));
             repoProc.running = true;
         }
@@ -139,9 +154,13 @@ QtObject {
         running: false
         stdout: StdioCollector {
             onStreamFinished: {
-                var it = root._queue[root._cursor];
+                if (root._await !== "repo")
+                    return; // réponse d'une étape déjà close : elle ne nous concerne plus
+                var it = root._current;
                 var res = root._parse(text);
-                var head = res ? Model.parseDefaultBranch(res) : "";
+                // La réponse doit désigner le dépôt interrogé, sinon elle vient d'ailleurs.
+                var head = Model.repoBelongsTo(res, it.owner, it.repoName) ? Model.parseDefaultBranch(res) : "";
+                root._await = "";
                 if (head)
                     root._compare(it, head);
                 else
@@ -149,13 +168,17 @@ QtObject {
             }
         }
         onExited: code => {
-            if (code !== 0)
+            // Filet : n'avance que si l'étape n'a pas déjà été close par sa sortie standard.
+            if (code !== 0 && root._await === "repo") {
+                root._await = "";
                 root._advance();
+            }
         }
     }
 
     function _compare(it, head) {
         root._heads[it.name] = head; // mémorisé pour le lien changelog de la vue
+        root._await = "compare";
         cmpProc.command = root._ghGet(Queries.compareApiUrl(root.apiBase, it.owner, it.repoName, it.lockRev, head));
         cmpProc.running = true;
     }
@@ -164,17 +187,25 @@ QtObject {
         running: false
         stdout: StdioCollector {
             onStreamFinished: {
-                var it = root._queue[root._cursor];
+                if (root._await !== "compare")
+                    return;
+                var it = root._current;
+                root._await = "";
                 var res = root._parse(text);
-                var b = res ? Model.parseCompare(res) : null;
-                if (typeof b === "number")
-                    root._behind[it.name] = b;
+                // La réponse doit porter sur la révision verrouillée de CET input.
+                if (Model.compareBelongsTo(res, it.lockRev)) {
+                    var b = Model.parseCompare(res);
+                    if (typeof b === "number")
+                        root._behind[it.name] = b;
+                }
                 root._advance();
             }
         }
         onExited: code => {
-            if (code !== 0)
+            if (code !== 0 && root._await === "compare") {
+                root._await = "";
                 root._advance();
+            }
         }
     }
 
