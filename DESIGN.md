@@ -100,17 +100,17 @@ noosphere est un **plugin DankMaterialShell** (`plugin.json` à la racine + `src
 installé dans `~/.config/DankMaterialShell/plugins/Noosphere/`. Il hérite du thème
 (Catppuccin Mocha) et des composants Material 3 de DMS.
 
-- `query` → `src/query/queries.js` : `flakeMetadata()` (argv nix), `compareApiUrl(...)`
-  (URL API GitHub compare), fonctions pures. Exécutées par `src/view/Noosphere.qml`
-  (service : Process `nix`, `curl` GET vers l'API GitHub, header `Authorization: Bearer`
-  si token, gestion d'erreur/timeout).
-- `model` → `src/model/inputs.js` (`parseMetadata` = inputs directs depuis `.locks.nodes`,
-  `parseCompare` = `behind` depuis `ahead_by`, `mergeBehind`, `behindCount`, `barState`)
-  + `format.js` (`relativeAge`, `stateColor`, `compareWebUrl`) — helpers de présentation
-  **hors** du modèle golden. Pur, testé par goldens + inline (`tests/`, `just test` / `just bless`).
-- `view` → `src/view/` : `NoosphereWidget` (barre + badge), `NoosphereGlyph` (le glyphe
-  rosace/engrenage), `Cockpit` (popout : carte EN-TÊTE + carte INPUTS), `Settings` (config :
-  chemin du flake, owner/repo, branche, token optionnel, intervalle). Thème = DMS.
+- `query` → `src/query/queries.js` : `flakeMetadata()` / `compareApiUrl()` / `repoApiUrl()`
+  (dérive), `buildToplevel()` / `nvdDiff()` / `hostnameArgv()` (diff de closure), fonctions
+  pures. Exécutées par les services (Process `nix`, `curl`, `nvd`).
+- `model` → `src/model/inputs.js` (dérive : `parseMetadata`, `parseCompare`, `mergeBehind`,
+  `behindCount`, `barState`) + `src/model/closure.js` (`parseNvdDiff`, `closureSeverity`,
+  `cardSeverity`) + `format.js` (helpers de présentation, **hors** modèle golden). Pur, testé
+  par goldens + inline (`tests/`, `just test` / `just bless`).
+- `view` → `src/view/` : services `Noosphere` (poll dérive) et `Closure` (build+diff à la
+  demande) ; `NoosphereWidget` (barre + badge), `NoosphereGlyph` (glyphe), `Cockpit` (popout :
+  cartes EN-TÊTE + INPUTS + DIFF DE CLOSURE), `ClosureCard` (carte diff), `Settings` (config).
+  Thème = DMS.
 
 ---
 

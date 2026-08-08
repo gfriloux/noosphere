@@ -22,18 +22,21 @@ Esprit et invariants : [`DESIGN.md`](./DESIGN.md). Méthode de travail :
 
 ## État
 
-**v0.1.0 — slice lecture seule.** noosphere est **installable et utilisable** : un service
-lit le flake local, interroge l'amont GitHub input par input, et affiche la dérive. Le
-**badge de barre** encode l'état (bleu = à jour, jaune + pastille = N inputs en retard,
-gris = check en échec), avec un glyphe rosace. Le **popout cockpit** offre une carte
-**EN-TÊTE** (identité du flake, branche, génération système courante, dernier check) et une
-carte **INPUTS** (une ligne par input direct : point d'état, canal, âge de lock, retard sur
-l'amont, lien **changelog** au survol des lignes en retard). Le pied propose la cadence et
-un **check maintenant** (re-check, lecture seule).
+**v0.2.0 — dérive + diff de closure.** noosphere est **installable et utilisable**. Le
+**badge de barre** encode l'état de dérive (bleu = à jour, jaune + pastille = N inputs en
+retard, gris = check en échec), glyphe rosace. Le **popout cockpit** offre :
+- une carte **EN-TÊTE** (identité du flake, branche, génération système courante, dernier check) ;
+- une carte **INPUTS** (une ligne par input direct : point d'état, canal, âge de lock, retard
+  sur l'amont, lien **changelog** au survol des lignes en retard) ;
+- une carte **DIFF DE CLOSURE** (v0.2.0) : sur le bouton « prévisualiser le rebuild »,
+  noosphere **build le toplevel à la demande** (`nix build`, **sans activation**) et affiche
+  le `nvd diff` contre la génération courante — résumé (màj/ajoutés/retirés/Δ taille) +
+  console des changements, avec marqueur ▲ / badge **REBOOT** sur les paquets kernel/firmware.
 
-Reste à venir (mutations = décision DESIGN + plan dédié) : boutons *update* / *tout mettre
-à jour*, carte **diff de closure** (`nvd`), carte **rebuild** (timeline + rollback).
-Fondations, invariants et direction visuelle : `DESIGN.md`.
+noosphere reste **lecture seule au sens système** : il observe (et build à la demande), il
+n'active jamais. Reste à venir (mutations = décision DESIGN + plan dédié) : boutons *update* /
+*tout mettre à jour* (`nix flake update`), carte **rebuild** (timeline + rollback). Fondations,
+invariants et direction visuelle : `DESIGN.md`.
 
 ## Développement
 
@@ -60,14 +63,17 @@ GitHub Actions** (`.github/workflows/ci.yml`) l'appellent.
 ## Structure du code
 
 ```
-src/query/queries.js         ← builders : argv nix flake metadata + URLs compare/repo GitHub
+src/query/queries.js         ← builders : nix flake metadata, compare/repo GitHub, nix build, nvd diff
 src/model/inputs.js          ← parse metadata/compare, behind, barState (pur, golden-testé)
+src/model/closure.js         ← parse nvd diff + heuristique de sévérité (pur, golden-testé)
 src/model/format.js          ← helpers de présentation (relativeAge, stateColor, compareWebUrl)
 src/view/Noosphere.qml       ← service : poll nix + compare GitHub → modèle de dérive
+src/view/Closure.qml         ← service : build toplevel + nvd diff à la demande → modèle de closure
 src/view/NoosphereWidget.qml ← badge de barre (PluginComponent) + montage du cockpit
 src/view/NoosphereGlyph.qml  ← glyphe rosace/engrenage (Canvas)
-src/view/Cockpit.qml         ← popout : cartes EN-TÊTE + INPUTS, pied cadence/check
-src/view/Settings.qml        ← réglages (chemin flake, dépôt/branche, token, cadence)
+src/view/Cockpit.qml         ← popout : cartes EN-TÊTE + INPUTS + DIFF DE CLOSURE, pied
+src/view/ClosureCard.qml     ← carte diff de closure (bouton, spinner, résumé, console)
+src/view/Settings.qml        ← réglages (chemin flake, hostname, dépôt/branche, token, cadence)
 tests/                       ← fixtures figées + goldens (modèle attendu)
 .claude/plans/               ← plans de version (plan.md, manual_tests.md, phase0_results.md)
 ```
@@ -99,9 +105,14 @@ token GitHub.
 3. **Token GitHub** (optionnel) : un token à portée publique lève la limite de 60
    requêtes/h de l'API compare. Il est envoyé par curl en header `Authorization: Bearer`.
 4. **Cadence** : la fréquence d'interrogation de l'amont (minutes).
+5. **Hostname** (optionnel, carte diff de closure) : la clé de `nixosConfigurations` à
+   builder pour l'aperçu. Vide → l'hôte courant (`hostname`).
 
-noosphere est **lecture seule** : le token n'a besoin d'aucun droit d'écriture, et rien
-n'est jamais écrit sur le flake ni sur le système.
+noosphere est **lecture seule au sens système** : le token n'a besoin d'aucun droit
+d'écriture, rien n'est jamais écrit sur le flake, et aucun build n'est **activé**. Le seul
+effet de bord possible est un `nix build` **à la demande** (bouton « prévisualiser le
+rebuild ») qui construit/télécharge des dérivations sans jamais basculer le système. Deps
+runtime posées par le module : `nix`, `curl`, `nvd`, `xdg-utils`.
 
 ## Release
 
