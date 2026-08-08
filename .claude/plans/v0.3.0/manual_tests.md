@@ -80,4 +80,38 @@ Lecture des traces de l'instance dev :
 
 ## Résultats
 
-_(à remplir lors de la validation)_
+### Déjà couvert automatiquement (harnais quickshell headless, hors barre DMS)
+
+Un harnais temporaire instanciait le service `Noosphere` seul, contre le mock puis contre
+le vrai GitHub. Il ne remplace pas les vérifications d'IHM ci-dessus, mais il tranche tout
+ce qui relève du transport.
+
+| Vérification | Résultat |
+|---|---|
+| §1 mock `drift` | nixpkgs 214 en retard, flake-parts résolu sur `main` puis à jour ; `bar=drift`, 1 en retard / 1 à jour |
+| §1 mock `uptodate` | 2 à jour, `bar=uptodate` |
+| §1 vrai GitHub | les 2 inputs résolus (`main`, `nixos-unstable`) et à jour — **recoupé** par appel direct à l'API : `ahead_by=0`, `base_commit.sha` concordant |
+| §1 nombre de lignes | 2 inputs directs du `flake.lock`, aucun sauté |
+| §2 délai maximal | trou noir réseau : poll abouti à **t+41 s** (2 × 20 s), donc par `httpTimeout` et non par le watchdog 60 s ; `_busy` relâché |
+| §3 mock `ratelimit` | **1 seule** requête émise puis arrêt sur « limite d'API GitHub atteinte », état `error` |
+| §3 mock `error` (500) | les 2 inputs interrogés, poll mené à terme, les 2 indéterminés, dernier état conservé |
+| §4 aucun curl | faux `curl` piégé en tête de PATH : **0 appel** intercepté sur un poll complet |
+| §5 `grep -rn curl src/` | plus que des commentaires et un extrait d'exemple de sortie `nvd` |
+
+### Reste à faire à la main (IHM et installation réelles)
+
+- [ ] §1 : puce « changelog » au survol d'une ligne en retard.
+- [ ] §2 : « check maintenant » après coupure — le bouton ne doit jamais rester sans effet ;
+      cinq clics rapides → un seul poll.
+- [ ] §3 : token volontairement invalide → message de token refusé ; input pointant un dépôt
+      inexistant → cet input seul indéterminé, les autres comparés.
+- [ ] §4 : `pgrep -af curl` et `grep -l "Bearer" /proc/*/cmdline` pendant un poll, **avec le
+      contrôle de méthode sur la 0.2.1 installée** (les commandes doivent y trouver le token,
+      sinon le test ne prouve rien).
+- [ ] §5 : installation via le module HM sur une machine sans `curl` dans le PATH du service.
+- [ ] Non-régression v0.2.x : badge, cartes, trois états de la carte closure, aperçu de
+      closure, `just bless`.
+
+> Note relevée en validant : un poll dont **tous** les appels échouent de façon non fatale
+> finit en vert (`live`, `bar=uptodate`) alors que rien n'a pu être vérifié. Antérieur à ce
+> plan, consigné dans `.claude/plans/TODO.md`.
