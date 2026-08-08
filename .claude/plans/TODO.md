@@ -45,6 +45,25 @@ manuels, faute de mieux.
 
 ---
 
+## Un poll où *tout* échoue finit quand même en vert
+
+**Repéré :** 2026-08-08, validation de v0.3.0. **Antérieur au plan** (même conduite avec
+`curl`), donc pas une régression — mais mesuré, cette fois.
+
+Quand chaque appel échoue de façon non fatale (5xx, réseau injoignable, délai dépassé),
+chaque input reste en retard indéterminé, le poll aboutit normalement et l'état passe à
+`live`. Aucun input n'ayant `behind > 0`, `barState` rend `uptodate` : le badge est **vert**
+alors que rien n'a pu être vérifié, et `lastCheck` est rafraîchi.
+
+Mesuré (mock `error`, 500 sur tout) : `status=live`, `behind=0 uptodate=0 bar=uptodate`,
+les deux inputs à `behind=null`.
+
+**Piste :** distinguer « tout indéterminé » de « tout à jour » — soit un état de barre
+dédié, soit conserver `error` quand aucun input comparable n'a pu être résolu. À trancher
+en DESIGN (le mapping couleur des états y est impératif), pas en douce.
+
+---
+
 ## Requêtes conditionnelles `If-None-Match` / `ETag`
 
 **Repéré :** 2026-08-08, étude du transport (v0.3.0). Écarté du périmètre à dessein.

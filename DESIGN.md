@@ -105,7 +105,8 @@ installé dans `~/.config/DankMaterialShell/plugins/Noosphere/`. Il hérite du t
   pures. Exécutées par les services (Process `nix` et `nvd` ; les URLs GitHub sont
   interrogées par `XMLHttpRequest`, sans processus externe).
 - `model` → `src/model/inputs.js` (dérive : `parseMetadata`, `parseCompare`, `mergeBehind`,
-  `behindCount`, `barState`, rattachement des réponses : `compareBelongsTo`, `repoBelongsTo`)
+  `behindCount`, `barState`, rattachement des réponses : `compareBelongsTo`, `repoBelongsTo`,
+  cause d'un échec d'appel : `githubError`)
   + `src/model/closure.js` (`parseNvdDiff`, `closureSeverity`,
   `cardSeverity`) + `format.js` (helpers de présentation, **hors** modèle golden). Pur, testé
   par goldens + inline (`tests/`, `just test` / `just bless`).
@@ -113,6 +114,30 @@ installé dans `~/.config/DankMaterialShell/plugins/Noosphere/`. Il hérite du t
   demande) ; `NoosphereWidget` (barre + badge), `NoosphereGlyph` (glyphe), `Cockpit` (popout :
   cartes EN-TÊTE + INPUTS + DIFF DE CLOSURE), `ClosureCard` (carte diff), `Settings` (config).
   Thème = DMS.
+
+#### Le transport HTTP reste dans le processus
+
+Les appels à l'API GitHub sont émis par le service en `XMLHttpRequest`, **jamais** par un
+client externe. La raison est le secret : passé à un processus, le token voyagerait dans
+son argv, donc dans `/proc/<pid>/cmdline`, lisible par tout processus local. Un header posé
+depuis le processus ne sort jamais de sa mémoire. C'est le corollaire d'exécution de la
+règle « l'auth vit dans un header » énoncée plus haut.
+
+Ce que ce transport apporte accessoirement : le **statut HTTP** est lisible (donc la cause
+d'un échec est nommable — `githubError`), les **redirections** sont suivies (un dépôt
+renommé cesse de casser en silence), et chaque requête étant un objet distinct, la réponse
+est rattachée à son input par sa closure plutôt que par un état partagé.
+
+Ce qu'il n'apporte pas de lui-même, et qui reste un **cap futur** (décision + PLAN dédiés,
+cf. `.claude/plans/TODO.md`) :
+
+| Piste | Gain | Coût |
+|---|---|---|
+| Requêtes conditionnelles `If-None-Match` / `ETag` | économie de quota, décisive **sans** token (60 req/h face à ~15 requêtes par poll) | un cache mémoire d'ETags, à invalider — et à ne pas persister (inv. 1) |
+| Compare en parallèle | latence d'un poll séquentiel | contrôle de concurrence, un délai par requête en vol, conduite de rate-limit à repenser |
+
+Le **séquentiel reste le choix par défaut** : budget de requêtes maîtrisé, et une seule
+requête en vol à la fois se raisonne sans effort.
 
 ---
 
