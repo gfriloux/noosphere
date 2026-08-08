@@ -27,6 +27,14 @@ PluginSettings {
     }
 
     StringSetting {
+        settingKey: "hostname"
+        label: "Hostname (diff de closure)"
+        description: "Clé de nixosConfigurations à builder pour l'aperçu de closure (carte DIFF DE CLOSURE). Laisser vide pour résoudre l'hôte courant via `hostname`."
+        placeholder: "(hôte courant)"
+        defaultValue: ""
+    }
+
+    StringSetting {
         settingKey: "repoSlug"
         label: "Dépôt (affichage)"
         description: "Identité du flake affichée dans l'en-tête du cockpit. Ex. « gfriloux/nixos »."
