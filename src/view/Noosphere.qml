@@ -76,11 +76,32 @@ QtObject {
             return;
         root._busy = true;
         root.connectionStatus = "polling";
+        stepWatchdog.restart();
         metaProc.command = ["nix"].concat(Queries.flakeMetadata(root.flakePath));
         metaProc.running = true;
         // Génération courante : best-effort, indépendant du pipeline de dérive.
         genRevProc.running = true;
         genTimeProc.running = true;
+    }
+
+    // Chien de garde d'étape. `curl` a son propre `--max-time`, mais rien ne garantit qu'un
+    // signal nous parvienne (processus tué, flux jamais clos, `nix` qui s'éternise). Sans ce
+    // filet, un poll n'atteindrait ni `_commit()` ni `_fail()` : `_busy` resterait vrai et
+    // « check maintenant » serait muet **définitivement**. Une étape perdue laisse simplement
+    // son input en retard indéterminé, on passe au suivant.
+    property Timer stepWatchdog: Timer {
+        interval: 60000
+        repeat: false
+        onTriggered: {
+            if (!root._busy)
+                return;
+            if (root._await.length > 0) {
+                root._await = "";
+                root._advance();
+            } else {
+                root._fail("check interrompu (délai dépassé)");
+            }
+        }
     }
 
     // Argv curl pour un GET d'API GitHub (JSON). Le token, s'il existe, va en header.
@@ -114,8 +135,11 @@ QtObject {
         if (!text || !text.trim())
             return; // échec → onExited
         var meta = root._parse(text);
-        if (meta === null)
+        if (meta === null) {
+            // `nix` a rendu 0 mais du non-JSON : sans issue explicite le poll resterait en vol.
+            root._fail("métadonnées du flake illisibles");
             return;
+        }
         root._inputs = Model.parseMetadata(meta);
         root._behind = {};
         root._heads = {};
@@ -145,6 +169,7 @@ QtObject {
         } else {
             // Pas de ref suivie → résoudre la branche par défaut du repo d'abord.
             root._await = "repo";
+            stepWatchdog.restart();
             repoProc.command = root._ghGet(Queries.repoApiUrl(root.apiBase, it.owner, it.repoName));
             repoProc.running = true;
         }
@@ -179,6 +204,7 @@ QtObject {
     function _compare(it, head) {
         root._heads[it.name] = head; // mémorisé pour le lien changelog de la vue
         root._await = "compare";
+        stepWatchdog.restart();
         cmpProc.command = root._ghGet(Queries.compareApiUrl(root.apiBase, it.owner, it.repoName, it.lockRev, head));
         cmpProc.running = true;
     }
@@ -217,6 +243,9 @@ QtObject {
     // ---- Aboutissement ----
 
     function _commit() {
+        stepWatchdog.stop();
+        root._await = "";
+        root._current = null;
         var list = Model.mergeBehind(root._inputs, root._behind);
         // Enrichit chaque input du head amont résolu (channel ou branche par défaut) : sert
         // au lien changelog de la vue. Hors modèle golden (dépend de la résolution réseau).
@@ -235,8 +264,12 @@ QtObject {
         root._busy = false;
     }
 
-    // Best-effort : conserve le dernier état connu (DESIGN inv. 7).
+    // Best-effort : conserve le dernier état connu (DESIGN inv. 7). Clôt l'étape en cours pour
+    // qu'une réponse tardive ne vienne pas s'appliquer au poll suivant.
     function _fail(msg) {
+        stepWatchdog.stop();
+        root._await = "";
+        root._current = null;
         root.connectionStatus = "error";
         root.errorMessage = msg;
         root._busy = false;
