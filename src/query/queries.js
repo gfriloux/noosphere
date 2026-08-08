@@ -19,15 +19,19 @@ function flakeMetadata(path) {
     return args;
 }
 
-// URL de l'API compare GitHub : GET .../repos/<owner>/<repo>/compare/<base>...<head>.
+// Base par défaut de l'API GitHub. Surchargeable (`apiBase`) pour pointer un mock local
+// en dev (`just mock`) sans toucher au réseau — cf. scripts/github-mock.py.
+var GITHUB_API = "https://api.github.com";
+
+// URL de l'API compare GitHub : GET <apiBase>/repos/<owner>/<repo>/compare/<base>...<head>.
 // La réponse porte `ahead_by` = nombre de commits dont `head` (branche amont) est en
 // avance sur `base` (révision verrouillée du lock) = le **retard** de l'input.
-function compareApiUrl(owner, repo, base, head) {
-    return "https://api.github.com/repos/" + owner + "/" + repo + "/compare/" + base + "..." + head;
+function compareApiUrl(apiBase, owner, repo, base, head) {
+    return (apiBase || GITHUB_API) + "/repos/" + owner + "/" + repo + "/compare/" + base + "..." + head;
 }
 
-// URL de l'API repo GitHub : GET .../repos/<owner>/<repo>. Sert à résoudre la branche par
-// défaut (`default_branch`) d'un input qui ne suit pas de `ref` explicite (cf. model).
-function repoApiUrl(owner, repo) {
-    return "https://api.github.com/repos/" + owner + "/" + repo;
+// URL de l'API repo GitHub : GET <apiBase>/repos/<owner>/<repo>. Sert à résoudre la branche
+// par défaut (`default_branch`) d'un input qui ne suit pas de `ref` explicite (cf. model).
+function repoApiUrl(apiBase, owner, repo) {
+    return (apiBase || GITHUB_API) + "/repos/" + owner + "/" + repo;
 }
