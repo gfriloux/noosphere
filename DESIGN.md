@@ -31,9 +31,11 @@ périmètre v1 : ce document ne détaille pas le rendu des mutations.
 Ce n'est **pas** :
 
 - Un gestionnaire de mise à jour. noosphere ne lance **pas** `nix flake update`,
-  `nixos-rebuild` ni `rollback` en v1 (cf. invariant *lecture seule*). Il **montre** l'écart.
-- Un builder ni un évaluateur de closure. Le diff de closure (`nvd`) et la timeline de
-  rebuild sont des **caps futurs** décrits par le handoff design, hors périmètre v1.
+  `nixos-rebuild switch/boot` ni `rollback` (cf. invariant *lecture seule*). Il **montre**
+  l'écart, et **prévisualise** la closure d'un build — sans jamais activer.
+- Un builder automatique. Depuis v0.2.0, noosphere peut **builder un toplevel à la demande**
+  (bouton) pour un `nvd diff` d'aperçu, mais jamais en tâche de fond, et sans activation. La
+  timeline de rebuild (activate/test) et le rollback restent des **caps futurs** (handoff).
 - Un miroir de `nix flake update --commit-lock-file`. Il lit le lock, il ne l'écrit pas.
 
 Aujourd'hui un seul flake est configuré, mais rien dans le modèle ne le suppose : voir
@@ -117,11 +119,14 @@ installé dans `~/.config/DankMaterialShell/plugins/Noosphere/`. Il hérite du t
 1. **Le flake local + GitHub font foi ; rien côté serveur.** Toute donnée affichée vient
    de `nix flake metadata --json` (état verrouillé) et de l'API compare GitHub (amont). Pas
    de cache parallèle persistant, aucune configuration côté serveur.
-2. **Lecture seule (v1).** noosphere lit l'état, il ne le mute pas. `nix flake update`,
-   `nixos-rebuild`, `rollback`, l'écriture du `flake.lock` sont **hors périmètre v1** — des
-   caps futurs (cf. handoff : carte diff de closure, carte rebuild) qui ne doivent pas être
-   peints dans un coin, mais qui ne sont pas construits. Toute mutation sera une décision
-   DESIGN explicite + un PLAN dédié.
+2. **Lecture seule — observe, n'active pas.** noosphere lit l'état système et peut, **à la
+   demande explicite de l'utilisateur**, **builder** un toplevel (`nix build …#…toplevel`,
+   depuis v0.2.0) pour en prévisualiser la closure : un build construit des dérivations et
+   télécharge, mais **n'active rien** — pas de `switch`/`boot`, pas de nouvelle génération,
+   pas de bascule du profil. Restent **hors périmètre** (décision DESIGN + PLAN dédié à
+   chaque fois) : `nix flake update` (écriture du `flake.lock`), `nixos-rebuild switch/boot`,
+   `rollback`. Le build **n'est jamais automatique** (jamais déclenché par un poll) : trop
+   lourd, et une action système ne se déclenche que sur intention explicite.
 3. **L'input est l'unité.** Le modèle raisonne en **inputs directs** du flake (ceux
    déclarés à la racine : `.locks.nodes[root].inputs`), pas en nœuds transitifs. Un input =
    un nom, un canal, une révision verrouillée, une date de lock, un retard. Le graphe de
@@ -142,8 +147,16 @@ installé dans `~/.config/DankMaterialShell/plugins/Noosphere/`. Il hérite du t
    flake introuvable, `nix` lent, GitHub injoignable ou rate-limité **dégrade l'affichage**
    (dernier état connu + statut d'erreur, badge en gris), ne fait **jamais** planter le widget.
 8. **Déterminisme de la couche données.** `query` + `model` sont déterministes pour un jeu
-   d'entrées figé (sortie `nix flake metadata` + réponses compare) — c'est ce qui rend les
-   golden tests possibles. `behind`/`behindCount`/`barState` sont des fonctions pures.
+   d'entrées figé (sortie `nix flake metadata` + réponses compare + sortie `nvd diff`) —
+   c'est ce qui rend les golden tests possibles. `behind`/`behindCount`/`barState` et
+   `parseNvdDiff`/`closureSeverity`/`cardSeverity` sont des fonctions pures.
+9. **La closure est une observation (v0.2.0).** Le diff de closure compare
+   `/run/current-system` (génération courante) à un **toplevel buildé à la demande** via
+   `nvd diff`. `nvd` est une **dépendance déclarée** (devShell + module home-manager +
+   `plugin.json`). La sévérité d'un changement est une **heuristique locale** : un paquet
+   kernel/firmware/pilote → `reboot` (badge REBOOT) ; les badges **CVE** sont **reportés**
+   (aucune source d'avis de sécurité fiable en local). Le liseré de la carte prend la
+   sévérité maximale.
 
 ---
 
@@ -227,10 +240,25 @@ Un mini-cockpit de dérive. Layout de référence (le prototype HTML détaille l
   `rgba(255,255,255,.045)` + apparition (120ms) du lien **changelog** (`#89b4fa`, ouvre le
   compare GitHub web) — **lecture seule**.
 
-> **Reporté (hors v1).** Boutons « update » / « Tout mettre à jour », carte **DIFF DE
-> CLOSURE** (`nvd`), carte **REBUILD** (timeline update→build→activate→test + rollback), pied
-> « check maintenant » mutant. Décrits par le handoff, ils deviendront des PLANs dédiés une
-> fois la mutation actée en DESIGN. Le glyphe en rotation (`rebuilding`) n'est pas déclenché.
+- **Carte DIFF DE CLOSURE** (liseré pêche `#fab387` si un changement `reboot`, sinon neutre
+  `#45475a` ; rouge `#f38ba8` si erreur) — aperçu **avant rebuild**, dérivé de `nvd diff`
+  entre `/run/current-system` et un toplevel **buildé à la demande**. Titre : icône `deployed_code`
+  + « DIFF DE CLOSURE ».
+  - **idle** : bouton « prévisualiser le rebuild » (`#89b4fa`) — la carte est vide tant qu'on
+    n'a pas buildé (jamais automatique).
+  - **building / diffing** : spinner mauve `#cba6f7` + libellé d'étape.
+  - **ready** : ligne résumé (mono 12px, segments séparés par « · » `#6c7086`) « N màj »
+    `#f9e2af` · « A ajoutés » `#a6e3a1` · « R retirés » `#f38ba8` · « Δ <taille> » `#fab387` ;
+    puis bloc console `#181825` (radius 9, mono 12px) : par entrée `nom  <from>  →  <to>`
+    (versions `#6c7086`, nouvelle `#cdd6f4`). Entrée `reboot` : nom pêche `#fab387`, marqueur
+    ▲, badge droit **REBOOT** (mono 9,5px, `#fab387` sur `rgba(250,179,135,.14)`).
+  - **error** : liseré rouge + message (extrait de la sortie `nix`/`nvd`).
+
+> **Reporté.** Badges **CVE** (nécessitent une source d'avis de sécurité — pas de source
+> locale fiable) ; visionneuse « voir les N changements » externe (la console montre déjà
+> tout) ; boutons « update » / « Tout mettre à jour » (`nix flake update`) ; carte **REBUILD**
+> (timeline update→build→activate→test + rollback). Ces derniers **mutent** et deviendront des
+> PLANs dédiés une fois actés en DESIGN. Le glyphe en rotation (`rebuilding`) n'est pas déclenché.
 
 ### États annexes
 
