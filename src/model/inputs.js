@@ -57,9 +57,29 @@ function parseCompare(res) {
     return null;
 }
 
+// La réponse compare `res` porte-t-elle bien sur la révision verrouillée `lockRev` ?
+// GitHub renvoie la base de la comparaison dans `base_commit.sha` : c'est le seul moyen de
+// rattacher une réponse à l'input qui l'a demandée. Une réponse tardive (requête abandonnée,
+// étape sautée) ou d'erreur ne matche pas → le service la jette au lieu d'attribuer son
+// retard au voisin (cf. .claude/plans/v0.2.1/plan.md).
+function compareBelongsTo(res, lockRev) {
+    if (!lockRev)
+        return false;
+    return !!(res && res.base_commit && res.base_commit.sha === lockRev);
+}
+
 // Réponse repo GitHub → branche par défaut (résout le head des inputs sans `ref` explicite).
 function parseDefaultBranch(res) {
     return (res && res.default_branch) || "";
+}
+
+// Même rattachement que `compareBelongsTo`, pour la réponse `GET /repos/<owner>/<repo>` :
+// `full_name` identifie le dépôt interrogé. Une réponse qui ne désigne pas le dépôt attendu
+// résoudrait le head d'un input sur la branche par défaut d'un autre.
+function repoBelongsTo(res, owner, repoName) {
+    if (!owner || !repoName)
+        return false;
+    return !!(res && res.full_name === owner + "/" + repoName);
 }
 
 // Head à comparer pour un input : sa `channel` (ref suivie) sinon la branche par défaut

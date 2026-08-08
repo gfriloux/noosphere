@@ -391,6 +391,7 @@ PopoutComponent {
             ClosureCard {
                 width: parent.width
                 service: cockpit.closureService
+                behindCount: cockpit.service ? cockpit.service.behindCount : 0
             }
 
             // ============ Pied : cadence + check maintenant (lecture seule) ============

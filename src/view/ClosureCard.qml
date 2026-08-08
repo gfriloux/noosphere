@@ -11,6 +11,10 @@ Rectangle {
     id: card
 
     property var service
+    // Inputs en retard vus par le service de dérive. Sert à distinguer « rien à faire » de
+    // « il y a du retard, mais on ne sait pas le prévisualiser » : sans cette information la
+    // carte contredirait la liste des inputs affichée juste au-dessus.
+    property int behindCount: 0
 
     readonly property var diff: service ? service.diff : null
     readonly property string status: service ? service.status : "idle"
@@ -98,14 +102,19 @@ Rectangle {
 
         // Nombre d'inputs en retard à prévisualiser (overrides vers l'amont).
         readonly property int updateCount: (card.service && card.service.overrides) ? card.service.overrides.length : 0
+        // Du retard existe mais aucun input n'est prévisualisable : leur amont n'a pas été
+        // résolu (type non-github, dépôt injoignable, réponse GitHub écartée). On le dit,
+        // plutôt que d'annoncer « aucun input en retard » à contre-sens de la liste.
+        readonly property bool unpreviewable: col.updateCount === 0 && card.behindCount > 0
 
         // --- idle, rien à mettre à jour : note ---
         StyledText {
             visible: card.status === "idle" && col.updateCount === 0
             width: parent.width
-            text: "aucun input en retard — rien à prévisualiser"
+            text: col.unpreviewable ? (card.behindCount === 1 ? "1 input en retard — amont non résolu, rien à prévisualiser" : card.behindCount + " inputs en retard — amont non résolu, rien à prévisualiser") : "aucun input en retard — rien à prévisualiser"
+            wrapMode: Text.WordWrap
             font.pixelSize: Theme.fontSizeSmall
-            color: "#6c7086"
+            color: col.unpreviewable ? "#f9e2af" : "#6c7086"
         }
 
         // --- idle : bouton de prévisualisation (build de la config mise à jour, à la demande) ---

@@ -104,7 +104,8 @@ installé dans `~/.config/DankMaterialShell/plugins/Noosphere/`. Il hérite du t
   (dérive), `buildToplevel()` / `nvdDiff()` / `hostnameArgv()` (diff de closure), fonctions
   pures. Exécutées par les services (Process `nix`, `curl`, `nvd`).
 - `model` → `src/model/inputs.js` (dérive : `parseMetadata`, `parseCompare`, `mergeBehind`,
-  `behindCount`, `barState`) + `src/model/closure.js` (`parseNvdDiff`, `closureSeverity`,
+  `behindCount`, `barState`, rattachement des réponses : `compareBelongsTo`, `repoBelongsTo`)
+  + `src/model/closure.js` (`parseNvdDiff`, `closureSeverity`,
   `cardSeverity`) + `format.js` (helpers de présentation, **hors** modèle golden). Pur, testé
   par goldens + inline (`tests/`, `just test` / `just bless`).
 - `view` → `src/view/` : services `Noosphere` (poll dérive) et `Closure` (build+diff à la
@@ -159,6 +160,19 @@ installé dans `~/.config/DankMaterialShell/plugins/Noosphere/`. Il hérite du t
    home-manager + `plugin.json`). La sévérité d'un changement est une **heuristique locale** :
    kernel/firmware/pilote → `reboot` (badge REBOOT) ; les badges **CVE** sont **reportés**
    (aucune source d'avis de sécurité fiable en local). Le liseré prend la sévérité maximale.
+10. **Une réponse appartient à l'input qui l'a demandée (v0.2.1).** Le poll interroge GitHub
+    **séquentiellement**, une étape à la fois. Contrat : **une étape = une requête = une
+    avance**. L'input est capturé au moment de l'émission — jamais relu depuis un curseur au
+    retour —, et chaque réponse est **rattachée** à lui (`compareBelongsTo` sur
+    `base_commit.sha`, `repoBelongsTo` sur `full_name`) avant d'être exploitée. Une réponse
+    orpheline est **jetée**, jamais devinée : attribuer le retard d'un input à son voisin est
+    pire que ne rien afficher. Un chien de garde borne chaque étape, de sorte qu'un poll rende
+    toujours la main : sans quoi un re-check manuel resterait sans effet.
+11. **L'affichage ne se contredit jamais lui-même.** Deux cartes qui décrivent le même état ne
+    peuvent pas l'énoncer différemment. Un input en retard mais non prévisualisable (amont non
+    résolu) est **nommé comme tel** par la carte de closure ; « aucun input en retard » est
+    réservé au cas où il n'y en a réellement aucun. Corollaire de l'invariant 7 : dégrader
+    l'affichage est permis, mentir ne l'est pas.
 
 ---
 
