@@ -1,0 +1,31 @@
+name: CI
+
+# Portes de qualité sur push et PR. Appelle `just ci` (fmt-check + lint + test) dans le
+# dev shell Nix — même définition que pre-commit et le dev local (le Justfile fait foi).
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+# Un seul run par ref : les push successifs annulent les runs obsolètes.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: cachix/install-nix-action@v30
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: just ci (fmt-check + lint + test)
+        run: nix develop --command just ci

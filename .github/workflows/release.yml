@@ -1,0 +1,32 @@
+name: Release
+
+# Déclenché quand l'utilisateur pousse un tag vX.Y.Z (politique git hybride : Claude ne tag
+# jamais). Génère les notes de la version via git-cliff et crée la release GitHub.
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # git-cliff a besoin de tout l'historique + les tags
+
+      - name: Notes de version (git-cliff --latest)
+        id: cliff
+        uses: orhun/git-cliff-action@v4
+        with:
+          config: cliff.toml
+          args: --latest --strip header
+
+      - name: Release GitHub
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          body: ${{ steps.cliff.outputs.content }}
