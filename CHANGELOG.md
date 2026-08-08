@@ -10,6 +10,8 @@ versions en [SemVer]. Généré depuis les Conventional Commits par git-cliff.
 
 ### Fonctionnalités
 
+- **view** : Closure = aperçu de mise à jour (sans muter)
+- **query** : Override-input pour l'aperçu de mise à jour
 - **view** : Carte diff de closure dans le cockpit
 - **view** : Service de diff de closure + déclare nvd
 - **model** : Parse nvd diff + heuristique de sévérité
@@ -17,6 +19,7 @@ versions en [SemVer]. Généré depuis les Conventional Commits par git-cliff.
 
 ### Documentation
 
+- État v0.2.0, structure et changelog
 - Cadre la carte diff de closure (build à la demande)
 
 ## [0.1.0] - 2026-08-08
