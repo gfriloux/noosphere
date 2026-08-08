@@ -59,6 +59,39 @@ TestCase {
         compare(Model.parseCompare(null), null);
     }
 
+    // Une réponse compare n'est exploitable que si elle porte bien sur la révision
+    // verrouillée de l'input attendu : sinon elle vient d'une requête d'un autre input
+    // (réponse tardive, étape sautée) et l'enregistrer attribuerait son retard au voisin.
+    function test_compareBelongsTo_match() {
+        compare(Model.compareBelongsTo({
+            "base_commit": {
+                "sha": "b22513e907a3efc7870bffeefbca0625a56ca460"
+            },
+            "ahead_by": 11
+        }, "b22513e907a3efc7870bffeefbca0625a56ca460"), true);
+    }
+    function test_compareBelongsTo_otherInput() {
+        compare(Model.compareBelongsTo({
+            "base_commit": {
+                "sha": "e8e87e6aa191072d5e9de1d483dd47999c88f642"
+            },
+            "ahead_by": 11
+        }, "b22513e907a3efc7870bffeefbca0625a56ca460"), false);
+    }
+    function test_compareBelongsTo_errorResponse() {
+        compare(Model.compareBelongsTo({
+            "message": "API rate limit exceeded"
+        }, "b22513e907a3efc7870bffeefbca0625a56ca460"), false);
+        compare(Model.compareBelongsTo(null, "b22513e907a3efc7870bffeefbca0625a56ca460"), false);
+    }
+    function test_compareBelongsTo_noLockRev() {
+        compare(Model.compareBelongsTo({
+            "base_commit": {
+                "sha": "b22513e907a3efc7870bffeefbca0625a56ca460"
+            }
+        }, ""), false);
+    }
+
     function test_parseDefaultBranch() {
         compare(Model.parseDefaultBranch({
             "default_branch": "master"
