@@ -18,6 +18,7 @@ versions en [SemVer]. Généré depuis les Conventional Commits par git-cliff.
 
 ### Documentation
 
+- Régénère le changelog (v0.2.1)
 - Consigner le contrat du driver de poll et l'interdit de se contredire
 - **plan** : Planifier v0.2.1 (driver de poll + carte closure honnête)
 - **readme** : Passe le README en anglais
