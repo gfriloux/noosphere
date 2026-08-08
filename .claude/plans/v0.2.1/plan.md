@@ -53,7 +53,7 @@ donc elle affirme « aucun input en retard » alors que la liste juste au-dessus
 
 ### Fichiers touchés
 
-- [ ] `src/model/inputs.js` — `compareBelongsTo()`
+- [ ] `src/model/inputs.js` — `compareBelongsTo()`, `repoBelongsTo()`
 - [ ] `src/view/Noosphere.qml` — driver, `--max-time`, watchdog
 - [ ] `src/view/ClosureCard.qml` — troisième état idle
 - [ ] `src/view/Cockpit.qml` — passe le nombre d'inputs en retard à la carte
@@ -82,8 +82,10 @@ documentée comme les voisines).
   plus `_queue[_cursor]` ;
 - `_await` (`""` | `"repo"` | `"compare"`) : une étape n'avance qu'une fois ; toute réponse ou
   sortie de processus qui ne correspond pas à l'attente courante est ignorée ;
-- la réponse compare est validée par `compareBelongsTo(res, _current.lockRev)` avant d'être
-  enregistrée ;
+- la réponse compare est validée par `compareBelongsTo(res, _current.lockRev)` et la réponse
+  repo par `repoBelongsTo(res, owner, repoName)` avant d'être exploitées — ajout en cours de
+  route : le `GET /repos/…` souffre du même défaut d'attribution que le compare, le corriger
+  d'un seul côté aurait laissé la moitié du chemin ouverte ;
 - `--max-time` porté à 20 s.
 **Vérification :** `just ci` + `manual_tests.md` §1 (mock `drift`, `ratelimit`, `error`)
 **Commit :** `fix(view): attribuer chaque réponse GitHub à l'input qui l'a demandée`

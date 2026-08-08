@@ -73,6 +73,15 @@ function parseDefaultBranch(res) {
     return (res && res.default_branch) || "";
 }
 
+// Même rattachement que `compareBelongsTo`, pour la réponse `GET /repos/<owner>/<repo>` :
+// `full_name` identifie le dépôt interrogé. Une réponse qui ne désigne pas le dépôt attendu
+// résoudrait le head d'un input sur la branche par défaut d'un autre.
+function repoBelongsTo(res, owner, repoName) {
+    if (!owner || !repoName)
+        return false;
+    return !!(res && res.full_name === owner + "/" + repoName);
+}
+
 // Head à comparer pour un input : sa `channel` (ref suivie) sinon la branche par défaut
 // du repo (fallback résolu par le service).
 function upstreamRef(input, fallbackBranch) {

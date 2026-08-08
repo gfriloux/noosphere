@@ -99,6 +99,24 @@ TestCase {
         compare(Model.parseDefaultBranch({}), "");
     }
 
+    function test_repoBelongsTo() {
+        compare(Model.repoBelongsTo({
+            "full_name": "gfriloux/stc",
+            "default_branch": "main"
+        }, "gfriloux", "stc"), true);
+        compare(Model.repoBelongsTo({
+            "full_name": "gfriloux/pgpilot",
+            "default_branch": "main"
+        }, "gfriloux", "stc"), false);
+        compare(Model.repoBelongsTo({
+            "message": "Not Found"
+        }, "gfriloux", "stc"), false);
+        compare(Model.repoBelongsTo(null, "gfriloux", "stc"), false);
+        compare(Model.repoBelongsTo({
+            "full_name": "gfriloux/stc"
+        }, "", "stc"), false);
+    }
+
     function test_upstreamRef() {
         compare(Model.upstreamRef({
             "channel": "nixos-unstable"
