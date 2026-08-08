@@ -35,3 +35,24 @@ function compareApiUrl(apiBase, owner, repo, base, head) {
 function repoApiUrl(apiBase, owner, repo) {
     return (apiBase || GITHUB_API) + "/repos/" + owner + "/" + repo;
 }
+
+// --- Diff de closure (v0.2.0, build à la demande — cf. DESIGN.md) ---
+
+// nix build du toplevel de la config NixOS <host> du flake <path>, SANS activation.
+// `--no-link` : pas de symlink `result` (aucun effet sur le cwd) ; `--print-out-paths` :
+// imprime le store path du toplevel sur stdout (= cible du nvd diff). Argv (le path et le
+// host restent des éléments distincts, pas de découpage shell).
+function buildToplevel(flakePath, host) {
+    return ["build", flakePath + "#nixosConfigurations." + host + ".config.system.build.toplevel", "--no-link", "--print-out-paths"];
+}
+
+// nvd diff <current> <target> → aperçu texte des changements de closure. `current` défaut
+// `/run/current-system` (génération active). Argv pour la commande `nvd`.
+function nvdDiff(current, target) {
+    return ["diff", current || "/run/current-system", target];
+}
+
+// hostname → résout l'hôte courant quand il n'est pas configuré (clé de nixosConfigurations).
+function hostnameArgv() {
+    return ["hostname"];
+}

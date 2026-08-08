@@ -33,4 +33,22 @@ TestCase {
     function test_repoApiUrl() {
         eq(Q.repoApiUrl("", "hercules-ci", "flake-parts"), "https://api.github.com/repos/hercules-ci/flake-parts");
     }
+
+    // --- Diff de closure (v0.2.0) ---
+
+    // Le path et le host restent des éléments argv distincts (pas de découpage shell).
+    function test_buildToplevel() {
+        eq(Q.buildToplevel("/etc/nixos", "kuri-desktop"), ["build", "/etc/nixos#nixosConfigurations.kuri-desktop.config.system.build.toplevel", "--no-link", "--print-out-paths"]);
+    }
+
+    function test_nvdDiff_default() {
+        eq(Q.nvdDiff("", "/nix/store/xxx-nixos-system"), ["diff", "/run/current-system", "/nix/store/xxx-nixos-system"]);
+    }
+    function test_nvdDiff_explicit() {
+        eq(Q.nvdDiff("/run/current-system", "/nix/store/yyy"), ["diff", "/run/current-system", "/nix/store/yyy"]);
+    }
+
+    function test_hostnameArgv() {
+        eq(Q.hostnameArgv(), ["hostname"]);
+    }
 }
