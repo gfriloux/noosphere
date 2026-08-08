@@ -2,9 +2,42 @@ import QtQuick
 import QtTest
 import "../src/model/inputs.js" as Model
 import "../src/model/format.js" as Format
+import "../src/model/closure.js" as Closure
 
 TestCase {
     name: "model"
+
+    // ---- closure : sévérité (le parse complet est golden-testé) ----
+
+    function test_closureSeverity_reboot() {
+        compare(Closure.closureSeverity("linux"), "reboot");
+        compare(Closure.closureSeverity("linux-firmware"), "reboot");
+        compare(Closure.closureSeverity("sof-firmware"), "reboot");
+        compare(Closure.closureSeverity("mesa"), "reboot");
+        compare(Closure.closureSeverity("nvidia-x11"), "reboot");
+        compare(Closure.closureSeverity("intel-microcode"), "reboot");
+    }
+    function test_closureSeverity_neutral() {
+        compare(Closure.closureSeverity("firefox"), "neutral");
+        compare(Closure.closureSeverity("curl"), "neutral");
+        compare(Closure.closureSeverity(""), "neutral");
+    }
+    function test_cardSeverity() {
+        compare(Closure.cardSeverity([
+            {
+                "severity": "neutral"
+            },
+            {
+                "severity": "reboot"
+            }
+        ]), "reboot");
+        compare(Closure.cardSeverity([
+            {
+                "severity": "neutral"
+            }
+        ]), "neutral");
+        compare(Closure.cardSeverity([]), "neutral");
+    }
 
     // ---- parseCompare / parseDefaultBranch / upstreamRef ----
 

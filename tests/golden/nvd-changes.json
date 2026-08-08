@@ -1,0 +1,31 @@
+{
+  "updated": 2,
+  "added": 1,
+  "removed": 0,
+  "pathsAdded": 17,
+  "pathsRemoved": 13,
+  "sizeDelta": "+142.7KiB",
+  "entries": [
+    {
+      "name": "curl",
+      "from": "8.20.0",
+      "to": "8.20.1",
+      "kind": "changed",
+      "severity": "neutral"
+    },
+    {
+      "name": "nix",
+      "from": "2.34.7",
+      "to": "2.34.8",
+      "kind": "changed",
+      "severity": "neutral"
+    },
+    {
+      "name": "noosphere-plugin",
+      "from": "",
+      "to": "<none>",
+      "kind": "added",
+      "severity": "neutral"
+    }
+  ]
+}
