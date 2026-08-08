@@ -1,137 +1,143 @@
 # noosphere
 
-Widget de **suivi de dérive de flake NixOS** pour la barre de bureau **Quickshell /
-DankMaterialShell**. Un badge d'état dans la barre (état de dérive + compteur d'inputs en
-retard) et un popup *cockpit* qui liste les inputs du flake et leur retard sur l'amont.
+A **NixOS flake drift tracker** widget for the **Quickshell / DankMaterialShell** desktop
+bar. A status badge in the bar (drift state + count of inputs behind) and a *cockpit*
+popup listing the flake's inputs and how far each one lags behind upstream.
 
-noosphere compare le `flake.lock` local (`nix flake metadata --json`) avec la branche
-amont sur **GitHub** (API compare) — **lecture seule**, par polling. **Rien à installer
-côté serveur**, et **aucune mutation** du système : noosphere *observe* la dérive.
+noosphere compares the local `flake.lock` (`nix flake metadata --json`) against the
+upstream branch on **GitHub** (compare API) — **read-only**, by polling. **Nothing to
+install server-side**, and **no mutation** of the system: noosphere *watches* drift.
 
-Esprit et invariants : [`DESIGN.md`](./DESIGN.md). Méthode de travail :
-[`PROCEDURE_PLANS.md`](./PROCEDURE_PLANS.md) et [`CLAUDE.md`](./CLAUDE.md).
+> The widget's UI and the project documentation are in **French**. This README is the
+> English entry point; the labels quoted below are the literal French strings you will see
+> on screen.
 
-## Pile
+Spirit and invariants: [`DESIGN.md`](./DESIGN.md). Working method:
+[`PROCEDURE_PLANS.md`](./PROCEDURE_PLANS.md) and [`CLAUDE.md`](./CLAUDE.md).
 
-- **Vue** : QML / Qt Quick (Quickshell), Material 3, Catppuccin Mocha.
-- **Données** : `query` (argv `nix flake metadata` + URLs compare GitHub, purs) → service
-  `Noosphere.qml` (Process `nix` + `curl`, header `Authorization: Bearer` si token) →
-  `model` (dérive, pur/testable) → `view` (QML).
-- **Auth** : token GitHub **optionnel** (lève la limite 60 req/h), à portée publique. Il
-  vit dans la config/le service, jamais dans les couches données ni les tests.
+## Stack
 
-## État
+- **View**: QML / Qt Quick (Quickshell), Material 3, Catppuccin Mocha.
+- **Data**: `query` (argv for `nix flake metadata` + GitHub compare URLs, pure) →
+  `Noosphere.qml` service (Process `nix` + `curl`, `Authorization: Bearer` header when a
+  token is set) → `model` (drift, pure/testable) → `view` (QML).
+- **Auth**: GitHub token **optional** (lifts the 60 req/h limit), public scope only. It
+  lives in the config and the service, never in the data layers nor in the tests.
 
-**v0.2.0 — dérive + diff de closure.** noosphere est **installable et utilisable**. Le
-**badge de barre** encode l'état de dérive (bleu = à jour, jaune + pastille = N inputs en
-retard, gris = check en échec), glyphe rosace. Le **popout cockpit** offre :
-- une carte **EN-TÊTE** (identité du flake, branche, génération système courante, dernier check) ;
-- une carte **INPUTS** (une ligne par input direct : point d'état, canal, âge de lock, retard
-  sur l'amont, lien **changelog** au survol des lignes en retard) ;
-- une carte **DIFF DE CLOSURE** (v0.2.0) : sur le bouton « prévisualiser le rebuild »,
-  noosphere **build le toplevel à la demande** (`nix build`, **sans activation**) et affiche
-  le `nvd diff` contre la génération courante — résumé (màj/ajoutés/retirés/Δ taille) +
-  console des changements, avec marqueur ▲ / badge **REBOOT** sur les paquets kernel/firmware.
+## Status
 
-noosphere reste **lecture seule au sens système** : il observe (et build à la demande), il
-n'active jamais. Reste à venir (mutations = décision DESIGN + plan dédié) : boutons *update* /
-*tout mettre à jour* (`nix flake update`), carte **rebuild** (timeline + rollback). Fondations,
-invariants et direction visuelle : `DESIGN.md`.
+**v0.2.0 — drift + closure diff.** noosphere is **installable and usable**. The **bar
+badge** encodes the drift state (blue = up to date, amber + dot = N inputs behind, grey =
+failed check), rosette glyph. The **cockpit popout** provides:
+- an **EN-TÊTE** card (header: flake identity, branch, current system generation, last check);
+- an **INPUTS** card (one row per direct input: state dot, channel, lock age, drift against
+  upstream, **changelog** link when hovering a row that is behind);
+- a **DIFF DE CLOSURE** card (closure diff, v0.2.0): on the *prévisualiser la mise à jour*
+  button, noosphere **builds the toplevel on demand** (`nix build`, **without activating
+  it**) and shows the `nvd diff` against the current generation — a summary
+  (updated/added/removed/Δ size) plus a console of the changes, with a ▲ marker and a
+  **REBOOT** badge on kernel and firmware packages.
 
-## Développement
+noosphere stays **read-only as far as the system is concerned**: it observes (and builds on
+demand), it never activates. Still to come (mutations require an explicit DESIGN decision
+and a dedicated plan): *update* / *update all* buttons (`nix flake update`), and a
+**rebuild** card (timeline + rollback). Foundations, invariants and visual direction:
+`DESIGN.md`.
 
-Toujours entrer le dev shell Nix (fournit quickshell, qmllint/qmlformat/qmltestrunner,
-just) :
+## Development
+
+Always enter the Nix dev shell first (it provides quickshell, qmllint/qmlformat/
+qmltestrunner, just):
 
 ```bash
 nix develop
-just ci        # porte complète : fmt-check + lint + test
+just ci        # full gate: fmt-check + lint + test
 ```
 
-Autres cibles : `just test` (golden + Qt Quick Test), `just fmt` (formate le QML),
-`just bless` (régénère les goldens — relire le diff), `just changelog` (régénère
-`CHANGELOG.md` via git-cliff). Pour l'essai visuel sans réseau ni serveur :
+Other targets: `just test` (golden + Qt Quick Test), `just fmt` (formats the QML),
+`just bless` (regenerates the goldens — read the diff), `just changelog` (regenerates
+`CHANGELOG.md` through git-cliff). To try it visually without network or server:
 
 ```bash
-just mock       # mock du compare GitHub (drift | uptodate | ratelimit | error)
-just dev-bar    # instance DMS isolée chargeant le worktree comme « Noosphere (dev) »
+just mock       # mock of the GitHub compare API (drift | uptodate | ratelimit | error)
+just dev-bar    # isolated DMS instance loading the worktree as “Noosphere (dev)”
 ```
 
-Le `Justfile` est la **seule** définition des portes de qualité ; pre-commit et la **CI
-GitHub Actions** (`.github/workflows/ci.yml`) l'appellent.
+The `Justfile` is the **only** definition of the quality gates; pre-commit and **GitHub
+Actions CI** (`.github/workflows/ci.yml`) both call it.
 
-## Structure du code
+## Code structure
 
 ```
-src/query/queries.js         ← builders : nix flake metadata, compare/repo GitHub, nix build, nvd diff
-src/model/inputs.js          ← parse metadata/compare, behind, barState (pur, golden-testé)
-src/model/closure.js         ← parse nvd diff + heuristique de sévérité (pur, golden-testé)
-src/model/format.js          ← helpers de présentation (relativeAge, stateColor, compareWebUrl)
-src/view/Noosphere.qml       ← service : poll nix + compare GitHub → modèle de dérive
-src/view/Closure.qml         ← service : build toplevel + nvd diff à la demande → modèle de closure
-src/view/NoosphereWidget.qml ← badge de barre (PluginComponent) + montage du cockpit
-src/view/NoosphereGlyph.qml  ← glyphe rosace/engrenage (Canvas)
-src/view/Cockpit.qml         ← popout : cartes EN-TÊTE + INPUTS + DIFF DE CLOSURE, pied
-src/view/ClosureCard.qml     ← carte diff de closure (bouton, spinner, résumé, console)
-src/view/Settings.qml        ← réglages (chemin flake, hostname, dépôt/branche, token, cadence)
-tests/                       ← fixtures figées + goldens (modèle attendu)
-.claude/plans/               ← plans de version (plan.md, manual_tests.md, phase0_results.md)
+src/query/queries.js         ← builders: nix flake metadata, GitHub compare/repo, nix build, nvd diff
+src/model/inputs.js          ← parses metadata/compare, behind, barState (pure, golden-tested)
+src/model/closure.js         ← parses nvd diff + severity heuristic (pure, golden-tested)
+src/model/format.js          ← presentation helpers (relativeAge, stateColor, compareWebUrl)
+src/view/Noosphere.qml       ← service: polls nix + GitHub compare → drift model
+src/view/Closure.qml         ← service: builds toplevel + nvd diff on demand → closure model
+src/view/NoosphereWidget.qml ← bar badge (PluginComponent) + cockpit mounting
+src/view/NoosphereGlyph.qml  ← rosette/gear glyph (Canvas)
+src/view/Cockpit.qml         ← popout: EN-TÊTE + INPUTS + DIFF DE CLOSURE cards, footer
+src/view/ClosureCard.qml     ← closure diff card (button, spinner, summary, console)
+src/view/Settings.qml        ← settings (flake path, hostname, repo/branch, token, poll interval)
+tests/                       ← frozen fixtures + goldens (expected model)
+.claude/plans/               ← per-version plans (plan.md, manual_tests.md, phase0_results.md)
 ```
 
 ## Installation
 
-Via home-manager, en tant que plugin DankMaterialShell :
+Through home-manager, as a DankMaterialShell plugin:
 
 ```nix
 # flake.nix (inputs)
 inputs.noosphere.url = "github:gfriloux/noosphere";
 
-# config home-manager
+# home-manager config
 imports = [inputs.noosphere.homeModules.default];
 programs.noosphere.enable = true;
 ```
 
-Puis, dans DMS : **Settings → Plugins → Noosphere** pour activer le widget, et son panneau
-de réglages pour renseigner le chemin du flake, le dépôt/branche affichés et (optionnel) un
-token GitHub.
+Then, in DMS: **Settings → Plugins → Noosphere** to enable the widget, and its settings
+panel to fill in the flake path, the repo/branch to display and (optionally) a GitHub
+token.
 
 ## Configuration
 
-1. **Chemin du flake** : le dossier local contenant `flake.nix` / `flake.lock`
-   (ex. `/etc/nixos`).
-2. **Dépôt / branche** (affichage) : l'identité du flake montrée dans l'en-tête
-   (ex. `gfriloux/nixos`, `main`). Le retard des inputs, lui, se mesure sur *leurs* propres
-   branches amont.
-3. **Token GitHub** (optionnel) : un token à portée publique lève la limite de 60
-   requêtes/h de l'API compare. Il est envoyé par curl en header `Authorization: Bearer`.
-4. **Cadence** : la fréquence d'interrogation de l'amont (minutes).
-5. **Hostname** (optionnel, carte diff de closure) : la clé de `nixosConfigurations` à
-   builder pour l'aperçu. Vide → l'hôte courant (`hostname`).
+1. **Flake path**: the local directory holding `flake.nix` / `flake.lock`
+   (e.g. `/etc/nixos`).
+2. **Repo / branch** (display): the flake identity shown in the header (e.g.
+   `gfriloux/nixos`, `main`). Input drift itself is measured against *their* own upstream
+   branches.
+3. **GitHub token** (optional): a public-scope token lifts the 60 requests/h limit of the
+   compare API. curl sends it in an `Authorization: Bearer` header.
+4. **Poll interval**: how often upstream is queried (minutes).
+5. **Hostname** (optional, closure diff card): the `nixosConfigurations` key to build for
+   the preview. Empty → the current host (`hostname`).
 
-noosphere est **lecture seule au sens système** : le token n'a besoin d'aucun droit
-d'écriture, rien n'est jamais écrit sur le flake, et aucun build n'est **activé**. Le seul
-effet de bord possible est un `nix build` **à la demande** (bouton « prévisualiser le
-rebuild ») qui construit/télécharge des dérivations sans jamais basculer le système. Deps
-runtime posées par le module : `nix`, `curl`, `nvd`, `xdg-utils`.
+noosphere is **read-only as far as the system is concerned**: the token needs no write
+access, nothing is ever written to the flake, and no build is ever **activated**. The only
+possible side effect is an **on-demand** `nix build` (the *prévisualiser la mise à jour*
+button) that builds/downloads derivations without ever switching the system. Runtime
+dependencies declared by the module: `nix`, `curl`, `nvd`, `xdg-utils`.
 
 ## Release
 
-Versionnage **SemVer**, changelog dérivé des **Conventional Commits** (git-cliff). Le tag
-est posé par le **mainteneur** (politique git hybride) et déclenche la publication.
+**SemVer** versioning, changelog derived from **Conventional Commits** (git-cliff). The tag
+is created by the **maintainer** (hybrid git policy) and triggers publication.
 
-1. Bumper `plugin.json` (`version`) sur la nouvelle version.
-2. `just changelog` pour rafraîchir `CHANGELOG.md`, relire le diff, committer.
-3. Merger sur `main`, puis :
+1. Bump `plugin.json` (`version`) to the new version.
+2. Run `just changelog` to refresh `CHANGELOG.md`, read the diff, commit.
+3. Merge onto `main`, then:
 
    ```bash
-   git tag -a vX.Y.Z -m "vX.Y.Z — <titre>"
+   git tag -a vX.Y.Z -m "vX.Y.Z — <title>"
    git push origin vX.Y.Z
    ```
 
-Le push du tag déclenche `.github/workflows/release.yml` : git-cliff génère les notes de la
-version et une **release GitHub** est créée. Les dépendances (inputs du flake, actions) sont
-tenues à jour par **Renovate**.
+Pushing the tag triggers `.github/workflows/release.yml`: git-cliff generates the release
+notes and a **GitHub release** is created. Dependencies (flake inputs, actions) are kept up
+to date by **Renovate**.
 
-## Licence
+## License
 
-Voir [`LICENSE`](./LICENSE).
+See [`LICENSE`](./LICENSE).
