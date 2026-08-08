@@ -6,7 +6,7 @@ versions en [SemVer]. Généré depuis les Conventional Commits par git-cliff.
 [Keep a Changelog]: https://keepachangelog.com/fr/1.1.0/
 [SemVer]: https://semver.org/lang/fr/
 
-## [Non publié]
+## [0.3.0] - 2026-08-08
 
 ### Fonctionnalités
 
@@ -23,6 +23,8 @@ versions en [SemVer]. Généré depuis les Conventional Commits par git-cliff.
 
 ### Documentation
 
+- Régénère le changelog (v0.3.0)
+- **plan** : Consigner les résultats de validation de v0.3.0
 - Consigner le transport interne et les pistes ETag / parallélisation
 - **plan** : Ouvrir un backlog et y consigner la porte lint défaillante
 - **plan** : Planifier le passage de curl à XMLHttpRequest (v0.3.0)
@@ -33,6 +35,7 @@ versions en [SemVer]. Généré depuis les Conventional Commits par git-cliff.
 
 ### Divers
 
+- **release** : Passe plugin.json en 0.3.0
 - Retirer curl des dépendances runtime
 - **deps** : Update cachix/install-nix-action action to v31
 - **deps** : Update actions/checkout action to v7
