@@ -11,16 +11,18 @@ Non automatisable : vrai `nix build` + `nvd`, rendu QML, Quickshell/Wayland.
 
 ## Cas à vérifier
 
-### Carte DIFF DE CLOSURE (liseré pêche/neutre)
-- [ ] État initial **idle** : bouton « prévisualiser le rebuild », pas de diff.
-- [ ] Clic → **build** : spinner mauve, statut « build… » puis « diff… ».
-- [ ] **ready** : ligne résumé « N màj · A ajoutés · R retirés · Δ <taille> » (segments
-      colorés), bloc console `#181825` listant `nom  from → to`.
-- [ ] Si un paquet kernel/firmware/pilote change : marqueur ▲ + badge **REBOOT** pêche sur
-      la ligne, et **liseré de carte pêche** ; sinon liseré neutre `#45475a`.
-- [ ] **Erreur** (hostname inexistant, flake non buildable) : liseré rouge, message d'erreur
-      (extrait de la sortie nix), pas de crash.
-- [ ] Re-cliquer relance un build/diff frais.
+### Carte DIFF DE CLOSURE — aperçu de mise à jour (liseré pêche/neutre)
+- [ ] **idle** avec N inputs en retard : bouton « prévisualiser la mise à jour (N) ».
+- [ ] **idle** sans dérive : note « aucun input en retard — rien à prévisualiser ».
+- [ ] Clic → **build** : spinner mauve, « build de la config mise à jour… » puis « diff… ».
+      (Le build pointe les inputs en retard sur leur amont via `--override-input`, sans
+      écrire `flake.lock` ni activer — vérifier que `git status` du flake reste propre.)
+- [ ] **ready** : résumé « N màj · A ajoutés · R retirés · Δ <taille> » **non nul** (contraste
+      avec un build du lock tel quel qui donnerait ~0), console `nom  from → to`.
+- [ ] Si nixpkgs en retard fait bouger le kernel : marqueur ▲ + badge **REBOOT** pêche +
+      **liseré pêche** ; sinon liseré neutre.
+- [ ] **Erreur** (hostname inexistant, éval qui casse) : liseré rouge, message, pas de crash.
+- [ ] « recalculer » relance un build/diff frais.
 
 ### Non-régression v0.1.0
 - [ ] Badge de barre inchangé (état de dérive + pastille).

@@ -96,9 +96,21 @@ Rectangle {
             }
         }
 
-        // --- idle : bouton de prévisualisation (build à la demande) ---
+        // Nombre d'inputs en retard à prévisualiser (overrides vers l'amont).
+        readonly property int updateCount: (card.service && card.service.overrides) ? card.service.overrides.length : 0
+
+        // --- idle, rien à mettre à jour : note ---
+        StyledText {
+            visible: card.status === "idle" && col.updateCount === 0
+            width: parent.width
+            text: "aucun input en retard — rien à prévisualiser"
+            font.pixelSize: Theme.fontSizeSmall
+            color: "#6c7086"
+        }
+
+        // --- idle : bouton de prévisualisation (build de la config mise à jour, à la demande) ---
         Rectangle {
-            visible: card.status === "idle"
+            visible: card.status === "idle" && col.updateCount > 0
             width: parent.width
             height: 34
             radius: 9
@@ -118,7 +130,7 @@ Rectangle {
                 }
                 StyledText {
                     anchors.verticalCenter: parent.verticalCenter
-                    text: "prévisualiser le rebuild"
+                    text: "prévisualiser la mise à jour (" + col.updateCount + ")"
                     font.pixelSize: Theme.fontSizeSmall
                     font.weight: Font.DemiBold
                     color: "#89b4fa"
@@ -155,7 +167,7 @@ Rectangle {
             }
             StyledText {
                 anchors.verticalCenter: parent.verticalCenter
-                text: card.status === "building" ? "build du toplevel (sans activation)…" : (card.status === "diffing" ? "calcul du diff de closure…" : "résolution de l'hôte…")
+                text: card.status === "building" ? "build de la config mise à jour (sans activation)…" : (card.status === "diffing" ? "calcul du diff de closure…" : "résolution de l'hôte…")
                 font.pixelSize: Theme.fontSizeSmall
                 color: "#a6adc8"
             }

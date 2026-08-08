@@ -6,6 +6,7 @@ import qs.Common
 import qs.Widgets
 import qs.Modules.Plugins
 import "../model/format.js" as Format
+import "../query/queries.js" as Queries
 
 PluginComponent {
     id: root
@@ -32,11 +33,27 @@ PluginComponent {
         intervalMs: root.cfgIntervalMs
     }
 
+    // Inputs en retard → overrides vers l'amont (aperçu de mise à jour, sans écrire le lock).
+    readonly property var closureOverrides: {
+        var out = [];
+        var ins = svc.inputs;
+        for (var i = 0; i < ins.length; i++) {
+            var it = ins[i];
+            if (it.type === "github" && typeof it.behind === "number" && it.behind > 0 && it.owner && it.head)
+                out.push({
+                    "name": it.name,
+                    "ref": Queries.githubFlakeRef(it.owner, it.repoName, it.head)
+                });
+        }
+        return out;
+    }
+
     // Service de diff de closure (build à la demande, jamais automatique).
     Closure {
         id: closureSvc
         flakePath: root.cfgFlakePath
         host: root.cfgHost
+        overrides: root.closureOverrides
     }
 
     // ---- Pièce de barre : glyphe rosace + pastille compteur ----

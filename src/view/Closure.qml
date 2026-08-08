@@ -17,6 +17,9 @@ QtObject {
     // --- Config (injectée par le widget) ---
     property string flakePath: ""
     property string host: "" // clé de nixosConfigurations ; vide → résolu via `hostname`
+    // Inputs en retard à pointer sur leur amont (--override-input) : liste { name, ref }.
+    // Vide → build du lock tel quel. Non vide → aperçu de mise à jour (sans écrire le lock).
+    property var overrides: []
 
     // --- Sortie ---
     // idle | resolving | building | diffing | ready | error
@@ -49,7 +52,7 @@ QtObject {
 
     function _build() {
         root.status = "building";
-        buildProc.command = ["nix"].concat(Queries.buildToplevel(root.flakePath, root._host));
+        buildProc.command = ["nix"].concat(Queries.buildToplevel(root.flakePath, root._host, root.overrides));
         buildProc.running = true;
     }
 

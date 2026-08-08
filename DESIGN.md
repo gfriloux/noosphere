@@ -150,13 +150,15 @@ installé dans `~/.config/DankMaterialShell/plugins/Noosphere/`. Il hérite du t
    d'entrées figé (sortie `nix flake metadata` + réponses compare + sortie `nvd diff`) —
    c'est ce qui rend les golden tests possibles. `behind`/`behindCount`/`barState` et
    `parseNvdDiff`/`closureSeverity`/`cardSeverity` sont des fonctions pures.
-9. **La closure est une observation (v0.2.0).** Le diff de closure compare
-   `/run/current-system` (génération courante) à un **toplevel buildé à la demande** via
-   `nvd diff`. `nvd` est une **dépendance déclarée** (devShell + module home-manager +
-   `plugin.json`). La sévérité d'un changement est une **heuristique locale** : un paquet
+9. **La closure prévisualise une mise à jour, sans muter (v0.2.0).** Le diff de closure
+   compare `/run/current-system` (génération courante) à un **toplevel buildé à la demande**
+   avec les inputs **en retard pointés sur leur amont** via `--override-input`
+   (`github:<owner>/<repo>/<ref>`) : on évalue « comme si mis à jour » **sans écrire
+   `flake.lock`** et **sans activer**. Aucun input en retard → rien à prévisualiser. Le build
+   n'est jamais automatique. `nvd` est une **dépendance déclarée** (devShell + module
+   home-manager + `plugin.json`). La sévérité d'un changement est une **heuristique locale** :
    kernel/firmware/pilote → `reboot` (badge REBOOT) ; les badges **CVE** sont **reportés**
-   (aucune source d'avis de sécurité fiable en local). Le liseré de la carte prend la
-   sévérité maximale.
+   (aucune source d'avis de sécurité fiable en local). Le liseré prend la sévérité maximale.
 
 ---
 
@@ -241,11 +243,13 @@ Un mini-cockpit de dérive. Layout de référence (le prototype HTML détaille l
   compare GitHub web) — **lecture seule**.
 
 - **Carte DIFF DE CLOSURE** (liseré pêche `#fab387` si un changement `reboot`, sinon neutre
-  `#45475a` ; rouge `#f38ba8` si erreur) — aperçu **avant rebuild**, dérivé de `nvd diff`
-  entre `/run/current-system` et un toplevel **buildé à la demande**. Titre : icône `deployed_code`
-  + « DIFF DE CLOSURE ».
-  - **idle** : bouton « prévisualiser le rebuild » (`#89b4fa`) — la carte est vide tant qu'on
-    n'a pas buildé (jamais automatique).
+  `#45475a` ; rouge `#f38ba8` si erreur) — **aperçu de mise à jour** : `nvd diff` entre
+  `/run/current-system` et un toplevel **buildé à la demande, inputs en retard pointés sur
+  l'amont** (`--override-input`, sans écrire le lock). Titre : icône `deployed_code` + « DIFF
+  DE CLOSURE ».
+  - **idle** : bouton « prévisualiser la mise à jour (N) » (`#89b4fa`) si N inputs en retard ;
+    sinon note « aucun input en retard ». La carte est vide tant qu'on n'a pas buildé (jamais
+    automatique).
   - **building / diffing** : spinner mauve `#cba6f7` + libellé d'étape.
   - **ready** : ligne résumé (mono 12px, segments séparés par « · » `#6c7086`) « N màj »
     `#f9e2af` · « A ajoutés » `#a6e3a1` · « R retirés » `#f38ba8` · « Δ <taille> » `#fab387` ;
