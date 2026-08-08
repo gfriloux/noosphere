@@ -8,6 +8,37 @@ versions en [SemVer]. Généré depuis les Conventional Commits par git-cliff.
 
 ## [Non publié]
 
+### Fonctionnalités
+
+- **view** : Nommer la cause d'un échec d'appel GitHub
+
+### Corrections
+
+- **dev** : Rendre les réponses du mock GitHub rattachables à leur input
+
+### Refactorisations
+
+- **view** : Rattacher chaque réponse GitHub par la closure de sa requête
+- **view** : Interroger GitHub par XMLHttpRequest au lieu de curl
+
+### Documentation
+
+- Consigner le transport interne et les pistes ETag / parallélisation
+- **plan** : Ouvrir un backlog et y consigner la porte lint défaillante
+- **plan** : Planifier le passage de curl à XMLHttpRequest (v0.3.0)
+
+### Tests
+
+- **model** : Couvrir la traduction des erreurs de l'API GitHub
+
+### Divers
+
+- Retirer curl des dépendances runtime
+- **deps** : Update cachix/install-nix-action action to v31
+- **deps** : Update actions/checkout action to v7
+
+## [0.2.1] - 2026-08-08
+
 ### Corrections
 
 - **view** : Distinguer « aucun retard » de « retard non prévisualisable »
@@ -26,6 +57,10 @@ versions en [SemVer]. Généré depuis les Conventional Commits par git-cliff.
 ### Tests
 
 - **model** : Reproduire l'attribution d'une réponse compare au mauvais input
+
+### Divers
+
+- **release** : Passe plugin.json en 0.2.1
 
 ## [0.2.0] - 2026-08-08
 

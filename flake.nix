@@ -49,8 +49,9 @@
             qt6.qtdeclarative # qmllint, qmlformat, qmltestrunner
             qt6.qtbase
 
-            # Runtime du service : lit le flake local (nix) + interroge l'amont GitHub (curl) ;
-            # nvd calcule le diff de closure (build à la demande, cf. DESIGN.md)
+            # Runtime du service : lit le flake local (nix) ; nvd calcule le diff de closure
+            # (build à la demande, cf. DESIGN.md). curl n'est plus un runtime — l'amont GitHub
+            # est interrogé par le service — mais reste ici pour recouper un retard à la main.
             nix
             curl
             nvd

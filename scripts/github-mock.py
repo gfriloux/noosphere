@@ -3,8 +3,12 @@
 
 Sert les endpoints utilisés par le service sur http://127.0.0.1:<port>, sans réseau ni
 token réel :
-    GET /repos/<owner>/<repo>/compare/<base>...<head>  → { "ahead_by": N, ... }
-    GET /repos/<owner>/<repo>                           → { "default_branch": "..." }
+    GET /repos/<owner>/<repo>/compare/<base>...<head>  → { "ahead_by": N, "base_commit", ... }
+    GET /repos/<owner>/<repo>                           → { "full_name", "default_branch" }
+
+Les réponses portent `base_commit.sha` et `full_name` parce que le service **vérifie** qu'une
+réponse désigne bien ce qu'il a demandé (`compareBelongsTo` / `repoBelongsTo`, cf. v0.2.1).
+Sans ces champs, le mock est rejeté en silence et tous les inputs restent indéterminés.
 
 Usage :
     python3 scripts/github-mock.py [port] [scenario]
@@ -65,14 +69,19 @@ def make_handler(scenario):
             # /repos/<owner>/<repo>/compare/<base>...<head>
             if len(parts) >= 5 and parts[0] == "repos" and parts[3] == "compare":
                 repo = parts[2]
+                # `base` = révision verrouillée demandée ; la renvoyer en `base_commit.sha`
+                # est ce qui rattache la réponse à l'input qui l'a demandée.
+                base = parts[4].split("...")[0]
                 ahead = 0 if scenario == "uptodate" else AHEAD_BY.get(repo, 5)
                 self._send({"status": "ahead" if ahead else "identical",
-                            "ahead_by": ahead, "behind_by": 0})
+                            "ahead_by": ahead, "behind_by": 0,
+                            "base_commit": {"sha": base}})
                 return
             # /repos/<owner>/<repo>
             if len(parts) == 3 and parts[0] == "repos":
-                repo = parts[2]
-                self._send({"default_branch": DEFAULT_BRANCH.get(repo, "main")})
+                owner, repo = parts[1], parts[2]
+                self._send({"full_name": owner + "/" + repo,
+                            "default_branch": DEFAULT_BRANCH.get(repo, "main")})
                 return
 
             self._send({"message": "Not Found"}, code=404)

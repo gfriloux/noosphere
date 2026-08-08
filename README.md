@@ -19,8 +19,9 @@ Spirit and invariants: [`DESIGN.md`](./DESIGN.md). Working method:
 
 - **View**: QML / Qt Quick (Quickshell), Material 3, Catppuccin Mocha.
 - **Data**: `query` (argv for `nix flake metadata` + GitHub compare URLs, pure) →
-  `Noosphere.qml` service (Process `nix` + `curl`, `Authorization: Bearer` header when a
-  token is set) → `model` (drift, pure/testable) → `view` (QML).
+  `Noosphere.qml` service (Process `nix`, GitHub queried in-process via `XMLHttpRequest`,
+  `Authorization: Bearer` header when a token is set) → `model` (drift, pure/testable) →
+  `view` (QML).
 - **Auth**: GitHub token **optional** (lifts the 60 req/h limit), public scope only. It
   lives in the config and the service, never in the data layers nor in the tests.
 
@@ -109,7 +110,8 @@ token.
    `gfriloux/nixos`, `main`). Input drift itself is measured against *their* own upstream
    branches.
 3. **GitHub token** (optional): a public-scope token lifts the 60 requests/h limit of the
-   compare API. curl sends it in an `Authorization: Bearer` header.
+   compare API. The service sends it in an `Authorization: Bearer` header, from within its
+   own process — it never appears in a command line.
 4. **Poll interval**: how often upstream is queried (minutes).
 5. **Hostname** (optional, closure diff card): the `nixosConfigurations` key to build for
    the preview. Empty → the current host (`hostname`).
@@ -118,7 +120,7 @@ noosphere is **read-only as far as the system is concerned**: the token needs no
 access, nothing is ever written to the flake, and no build is ever **activated**. The only
 possible side effect is an **on-demand** `nix build` (the *prévisualiser la mise à jour*
 button) that builds/downloads derivations without ever switching the system. Runtime
-dependencies declared by the module: `nix`, `curl`, `nvd`, `xdg-utils`.
+dependencies declared by the module: `nix`, `nvd`, `xdg-utils`.
 
 ## Release
 

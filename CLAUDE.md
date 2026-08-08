@@ -18,8 +18,9 @@ invariants : `DESIGN.md`.
 
 - **Vue** : QML / Qt Quick (Quickshell), Material 3, Catppuccin Mocha.
 - **Données** : couche `query` (argv `nix flake metadata` + URL compare GitHub, purs) →
-  service `Noosphere.qml` (exécute Process `nix` + `curl`, header `Authorization: Bearer`
-  si token) → `model` (modèle de dérive, pur/testable) → `view` (QML). Le QML ne
+  service `Noosphere.qml` (exécute Process `nix`, interroge GitHub par `XMLHttpRequest`,
+  header `Authorization: Bearer` si token) → `model` (modèle de dérive, pur/testable) →
+  `view` (QML). Le QML ne
   **construit** jamais de commande ni d'URL en direct.
 
 ```

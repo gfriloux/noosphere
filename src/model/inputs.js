@@ -82,6 +82,67 @@ function repoBelongsTo(res, owner, repoName) {
     return !!(res && res.full_name === owner + "/" + repoName);
 }
 
+// Statut HTTP d'un appel GitHub → cause nommée, ou `null` si l'appel s'est bien passé.
+// Rendu : { message, fatal }.
+//
+// `fatal` distingue une cause qui vaut pour **toutes** les requêtes suivantes (jeton
+// refusé, limite de débit : les marteler ne ferait qu'aggraver) d'une cause propre à un
+// seul input (dépôt introuvable, incident serveur), auquel cas le poll continue et cet
+// input reste simplement en retard indéterminé.
+//
+// `timedOut` : nous avons abandonné la requête nous-mêmes. Sans ce drapeau la panne réseau
+// et le délai dépassé seraient indiscernables — tous deux rendent `status === 0`.
+function githubError(status, body, timedOut) {
+    if (status >= 200 && status < 300)
+        return null;
+
+    if (status === 0) {
+        return {
+            "message": timedOut ? "délai dépassé" : "réseau injoignable",
+            "fatal": false
+        };
+    }
+    if (status === 401)
+        return {
+            "message": "token GitHub refusé",
+            "fatal": true
+        };
+    if (status === 429)
+        return {
+            "message": "limite d'API GitHub atteinte",
+            "fatal": true
+        };
+    if (status === 403) {
+        // GitHub rend 403 aussi bien pour une limite de débit que pour un accès interdit ;
+        // seul le corps les sépare. Illisible → on s'en tient au cas générique.
+        var msg = "";
+        try {
+            msg = (JSON.parse(body) || {}).message || "";
+        } catch (e) {
+            msg = "";
+        }
+        var limite = msg.toLowerCase().indexOf("rate limit") >= 0;
+        return {
+            "message": limite ? "limite d'API GitHub atteinte" : "accès refusé par GitHub",
+            "fatal": true
+        };
+    }
+    if (status === 404)
+        return {
+            "message": "dépôt introuvable",
+            "fatal": false
+        };
+    if (status >= 500)
+        return {
+            "message": "GitHub indisponible (" + status + ")",
+            "fatal": false
+        };
+    return {
+        "message": "réponse inattendue de GitHub (" + status + ")",
+        "fatal": false
+    };
+}
+
 // Head à comparer pour un input : sa `channel` (ref suivie) sinon la branche par défaut
 // du repo (fallback résolu par le service).
 function upstreamRef(input, fallbackBranch) {
