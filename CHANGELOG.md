@@ -6,6 +6,22 @@ Every notable change to noosphere. Format inspired by [Keep a Changelog], versio
 [Keep a Changelog]: https://keepachangelog.com/en/1.1.0/
 [SemVer]: https://semver.org/
 
+## [0.5.0] - 2026-10-18
+
+### Features
+
+- **i18n**: Add the French table, its packaging and its gate
+- **view**: English source strings, wrapped for translation
+
+### Refactoring
+
+- **model**: Return state instead of prose, and render the poll's cause
+
+### Documentation
+
+- Translate the remaining comments and the manifest description
+- Plan the English and i18n pass
+
 ## [0.4.0] - 2026-10-18
 
 ### Bug fixes

@@ -9,9 +9,21 @@ upstream branch on **GitHub** (compare API) — **read-only**, by polling. **Not
 install server-side**, and **no mutation** of the system: noosphere *watches* drift.
 
 > **English is the project's default language** — documentation, code comments, commit
-> messages, and the software's own copy. The **widget's UI copy is still French**, pending
-> its own internationalisation plan (EN/FR), after which French becomes one locale of two;
-> the labels quoted below are the literal French strings you will see on screen today.
+> messages, and the software's own copy. Since v0.5.0 the **widget's UI is English too**,
+> with **French** shipped as a translation (`translations/fr.json`): DMS picks it up on its
+> own when the shell's locale is French, so the labels quoted below are what an
+> English-locale desktop shows, and their French equivalents are what a French one shows.
+> Adding a locale is adding one JSON file — see `scripts/check-translations` for what the
+> gate expects of it.
+
+> **Requires DankMaterialShell ≥ 1.6.0.** The UI's translation lookup is DMS's own
+> `I18n.trFor`, which **does not exist** before 1.6.0 — so on an older DMS the widget does
+> not degrade to English, it **breaks**: every label raises a TypeError and the cockpit
+> comes up empty. The manifest declares `requires_dms: ">=1.6.0"`, which DMS's plugin
+> browser honours, but **nothing enforces it on a home-manager install**: that path writes
+> the plugin directory straight into `~/.config/DankMaterialShell/plugins/`, where no
+> manifest field is consulted. If you install this way, this paragraph is the only warning
+> you get. Pin noosphere v0.4.0 while your DMS is older.
 
 Spirit and invariants: [`DESIGN.md`](./DESIGN.md). Working method:
 [`PROCEDURE_PLANS.md`](./PROCEDURE_PLANS.md) and [`CLAUDE.md`](./CLAUDE.md).
@@ -27,6 +39,15 @@ Spirit and invariants: [`DESIGN.md`](./DESIGN.md). Working method:
   lives in the config and the service, never in the data layers nor in the tests.
 
 ## Status
+
+**v0.5.0 — English by default, French as a translation.** The whole repository and the
+whole UI are English, and the cockpit is internationalised: every user-facing string is an
+English id wrapped in DMS's `I18n.trFor`, and `translations/fr.json` carries the French.
+The model layer stopped returning prose — it returns state, and the view turns state into
+words — which is what made the wording translatable at all, and it also means the status row
+now *names* the cause of a failed check instead of computing it and throwing it away. A
+hermetic gate (`just check-translations`) keeps the table and the source in step in both
+directions. This release **requires DMS ≥ 1.6.0** (see the warning at the top).
 
 **v0.4.0 — gates that guard, and a badge that no longer overstates.** noosphere is
 **installable and usable**. The **bar badge** encodes the drift state (blue = up to date,
@@ -46,7 +67,7 @@ The **cockpit popout** provides:
 - a **header** card (flake identity, branch, current system generation, last check);
 - an **INPUTS** card (one row per direct input: state dot, channel, lock age, drift against
   upstream, **changelog** link when hovering a row that is behind);
-- a **DIFF DE CLOSURE** card (closure diff, v0.2.0): on the *prévisualiser la mise à jour*
+- a **CLOSURE DIFF** card (closure diff, v0.2.0): on the *preview the update*
   button, noosphere **builds the toplevel on demand** (`nix build`, **without activating
   it**) and shows the `nvd diff` against the current generation — a summary
   (updated/added/removed/Δ size) plus a console of the changes, with a ▲ marker and a
@@ -65,7 +86,7 @@ qmltestrunner, just):
 
 ```bash
 nix develop
-just ci        # full gate: fmt-check + lint + test
+just ci        # full gate: fmt-check + check-manifest + check-translations + lint + test
 ```
 
 > **The `lint` leg needs DankMaterialShell installed.** `qmllint` cannot resolve DMS's `qs.*`
@@ -76,7 +97,8 @@ just ci        # full gate: fmt-check + lint + test
 
 Other targets: `just test` (golden + Qt Quick Test), `just fmt` (formats the QML),
 `just bless` (regenerates the goldens — read the diff), `just check-manifest` (`plugin.json`
-against DMS's published schema), `just changelog` (**prepends** the section for the version
+against DMS's published schema), `just check-translations` (every string `src/` renders has a
+French entry, and every entry is still rendered), `just changelog` (**prepends** the section for the version
 in `plugin.json`; it does not regenerate, so the published French sections survive). To try
 it visually without network or server:
 
@@ -141,7 +163,7 @@ token.
 
 noosphere is **read-only as far as the system is concerned**: the token needs no write
 access, nothing is ever written to the flake, and no build is ever **activated**. The only
-possible side effect is an **on-demand** `nix build` (the *prévisualiser la mise à jour*
+possible side effect is an **on-demand** `nix build` (the *preview the update*
 button) that builds/downloads derivations without ever switching the system. Runtime
 dependencies declared by the module: `nix`, `nvd`, `xdg-utils`.
 

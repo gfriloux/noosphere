@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Mock de l'API GitHub (compare + repo) pour le dev de noosphere.
+"""Mock of the GitHub API (compare + repo), for developing noosphere.
 
 Serves the endpoints the service uses on http://127.0.0.1:<port>, with no network and no
 real token:
@@ -10,11 +10,11 @@ Responses carry `base_commit.sha` and `full_name` because the service **checks**
 response names what it asked for (`compareBelongsTo` / `repoBelongsTo`, see v0.2.1). Without
 those fields the mock is silently rejected and every input stays indeterminate.
 
-Usage :
+Usage:
     python3 scripts/github-mock.py [port] [scenario]
     port     : defaults to 8385
     scenario : drift (default) | uptodate | ratelimit | error
-               (aussi lisible via $NOOSPHERE_MOCK_SCENARIO)
+               (also read from $NOOSPHERE_MOCK_SCENARIO)
 
 Set the plugin's "GitHub API base (dev)" setting to http://127.0.0.1:<port>.
 """

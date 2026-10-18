@@ -3,7 +3,7 @@
 // can execute them — quickshell, for its file-writing capability.
 //
 // It lives at the repository root: quickshell roots the config on the -p directory, and the
-// imports ne doivent pas en sortir. Racine = repo → `src/` et `tests/` sont tous deux
+// imports must not escape that root. Root = the repository → both `src/` and `tests/` are
 // reachable (cases.js imports `../src/model/...`). Reads are relative to this file, writes
 // relative to the cwd — the repository root, where `just` places itself.
 import QtQuick

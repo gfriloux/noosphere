@@ -1,7 +1,7 @@
 name: Release
 
-# Déclenché quand l'utilisateur pousse un tag vX.Y.Z (politique git hybride : Claude ne tag
-# jamais). Génère les notes de la version via git-cliff et crée la release GitHub.
+# Triggered when the maintainer pushes a vX.Y.Z tag (the hybrid git policy: the agent never
+# tags). Generates the release notes with git-cliff and creates the GitHub release.
 
 on:
   push:
@@ -16,16 +16,16 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          fetch-depth: 0 # git-cliff a besoin de tout l'historique + les tags
+          fetch-depth: 0 # git-cliff needs the whole history, tags included
 
-      - name: Notes de version (git-cliff --latest)
+      - name: Release notes (git-cliff --latest)
         id: cliff
         uses: orhun/git-cliff-action@v4
         with:
           config: cliff.toml
           args: --latest --strip header
 
-      - name: Release GitHub
+      - name: GitHub release
         uses: softprops/action-gh-release@v3
         with:
           name: ${{ github.ref_name }}

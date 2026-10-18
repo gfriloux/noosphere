@@ -44,12 +44,12 @@
         devShells.default = pkgs.mkShell {
           name = "noosphere";
           packages = with pkgs; [
-            # Runtime / cible (bless via quickshell, lint/format/test via Qt6)
+            # Runtime / target (bless through quickshell, lint/format/test through Qt6)
             quickshell
             qt6.qtdeclarative # qmllint, qmlformat, qmltestrunner
             qt6.qtbase
 
-            # Runtime du service : lit le flake local (nix) ; nvd calcule le diff de closure
+            # Service runtime: reads the local flake (nix); nvd computes the closure diff
             # (built on demand, see DESIGN.md). curl is no longer a runtime dependency — the
             # service queries GitHub itself — but stays here to cross-check a lag by hand.
             nix
@@ -60,12 +60,12 @@
             python3
             jq
 
-            # Outillage projet
+            # Project tooling
             just
             git
-            git-cliff # changelog depuis les Conventional Commits (just changelog)
+            git-cliff # changelog from the Conventional Commits (just changelog)
 
-            # Portes Nix (cf. .pre-commit-config.yaml)
+            # Nix gates (see .pre-commit-config.yaml)
             alejandra
             deadnix
           ];

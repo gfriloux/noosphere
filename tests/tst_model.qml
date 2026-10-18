@@ -7,7 +7,7 @@ import "../src/model/closure.js" as Closure
 TestCase {
     name: "model"
 
-    // ---- closure : sévérité (le parse complet est golden-testé) ----
+    // ---- closure: severity (the full parse is golden-tested) ----
 
     function test_closureSeverity_reboot() {
         compare(Closure.closureSeverity("linux"), "reboot");
@@ -59,9 +59,9 @@ TestCase {
         compare(Model.parseCompare(null), null);
     }
 
-    // Une réponse compare n'est exploitable que si elle porte bien sur la révision
-    // verrouillée de l'input attendu : sinon elle vient d'une requête d'un autre input
-    // (réponse tardive, étape sautée) et l'enregistrer attribuerait son retard au voisin.
+    // A compare response is only usable if it really is about the expected input's locked
+    // revision: otherwise it answers another input's request (a late response, a skipped
+    // step), and recording it would credit that input's lag to its neighbour.
     function test_compareBelongsTo_match() {
         compare(Model.compareBelongsTo({
             "base_commit": {

@@ -2,20 +2,20 @@
 .import "../src/model/inputs.js" as Model
 .import "../src/model/closure.js" as Closure
 
-// Registre unique des cas golden, consommé par tst_golden.qml ET bless.qml.
-// Chaque cas : { name, transform } avec fixtures/<name>.json → golden/<name>.json.
+// The single registry of golden cases, read by tst_golden.qml AND bless.qml.
+// One case: { name, transform }, with fixtures/<name>.json → golden/<name>.json.
 
-// Sortie `nix flake metadata --json` figée → inputs directs (parseMetadata).
+// Frozen `nix flake metadata --json` output → the direct inputs (parseMetadata).
 function metadataCase(input) {
     return Model.parseMetadata(input);
 }
 
-// { inputs (déjà parsés), behind (map name→retard) } → inputs annotés (mergeBehind).
+// { inputs (already parsed), behind (name → how far behind) } → annotated inputs (mergeBehind).
 function mergeCase(input) {
     return Model.mergeBehind(input.inputs, input.behind);
 }
 
-// { text } = sortie `nvd diff` figée → modèle de closure (parseNvdDiff).
+// { text } = frozen `nvd diff` output → the closure model (parseNvdDiff).
 function nvdCase(input) {
     return Closure.parseNvdDiff(input.text);
 }
