@@ -29,7 +29,7 @@ Spirit and invariants: [`DESIGN.md`](./DESIGN.md). Working method:
 ## Status
 
 **v0.3.0 — drift + closure diff, GitHub queried in-process.** noosphere is **installable
-and usable**. The **bar badge** encodes the drift state (blue = up to date, amber + dot = N
+and usable**. The **bar badge** encodes the drift state (blue = up to date, yellow + dot = N
 inputs behind, grey = failed check), rosette glyph. Since v0.3.0 the GitHub compare calls
 are issued by the service itself through `XMLHttpRequest` rather than an external `curl`
 process, so the token never reaches a command line. The **cockpit popout** provides:

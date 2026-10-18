@@ -1,324 +1,334 @@
 # DESIGN.md — noosphere
 
-> Ce document définit l'esprit, la structure et les **invariants** de noosphere.
-> Avant d'ajouter quoi que ce soit, vérifie que ça s'inscrit ici. Si ce n'est pas
-> le cas, la réponse est non.
+> This document defines noosphere's spirit, structure and **invariants**.
+> Before adding anything, check that it fits here. If it does not, the
+> answer is no.
 
 ---
 
-## Ce qu'est noosphere
+## What noosphere is
 
-noosphere est un **widget de suivi de dérive de flake NixOS** pour la barre de bureau
-**Quickshell / DankMaterialShell** (Material 3, thème Catppuccin Mocha). Une icône dans
-la barre affiche un **badge d'état** (état de dérive + compteur d'inputs en retard) ; au
-clic, un **popup cockpit** ancré sous l'icône répond en un regard à : *combien d'inputs
-dérivent, et de combien.*
+noosphere is a **NixOS flake drift tracker widget** for the **Quickshell /
+DankMaterialShell** desktop bar (Material 3, Catppuccin Mocha theme). An icon in the bar
+shows a **status badge** (drift state + count of inputs behind); on click, a **cockpit
+popup** anchored under the icon answers at a glance: *how many inputs are drifting, and by
+how much.*
 
-Il compare les **inputs du flake local** (révisions verrouillées dans `flake.lock`, lues
-via `nix flake metadata --json`) avec l'**amont** (branche suivie sur GitHub) et affiche
-le **retard** (nombre de commits) de chaque input.
+It compares the **local flake's inputs** (revisions locked in `flake.lock`, read through
+`nix flake metadata --json`) against **upstream** (the branch tracked on GitHub) and shows
+how far **behind** (number of commits) each input is.
 
-La source de vérité est double et **locale à la lecture** : le **flake sur disque** (pour
-l'état verrouillé) et l'**API compare de GitHub** (pour l'amont). **Rien n'est à installer
-côté serveur.** Le rafraîchissement se fait par **polling** périodique. En v1, noosphere
-est en **lecture seule** : il observe la dérive, il ne mute pas le système.
+The source of truth is twofold and **local as far as reading goes**: the **flake on disk**
+(for the locked state) and **GitHub's compare API** (for upstream). **Nothing is to be
+installed server-side.** Refreshing happens by periodic **polling**. In v1, noosphere is
+**read-only**: it observes drift, it does not mutate the system.
 
-noosphere est une **surface d'observation** au-dessus d'un flake. Ce qu'on fait ensuite
-d'une dérive (lire le changelog amont, décider d'un `nix flake update`, lancer un
-`nixos-rebuild`) est de la **délégation** ou une **capacité future explicite**, pas le
-périmètre v1 : ce document ne détaille pas le rendu des mutations.
+noosphere is an **observation surface** on top of a flake. What one does next with a drift
+(read the upstream changelog, decide on a `nix flake update`, launch a `nixos-rebuild`) is
+**delegation** or an **explicit future capability**, not v1's scope: this document does not
+detail how mutations would be rendered.
 
-Ce n'est **pas** :
+It is **not**:
 
-- Un gestionnaire de mise à jour. noosphere ne lance **pas** `nix flake update`,
-  `nixos-rebuild switch/boot` ni `rollback` (cf. invariant *lecture seule*). Il **montre**
-  l'écart, et **prévisualise** la closure d'un build — sans jamais activer.
-- Un builder automatique. Depuis v0.2.0, noosphere peut **builder un toplevel à la demande**
-  (bouton) pour un `nvd diff` d'aperçu, mais jamais en tâche de fond, et sans activation. La
-  timeline de rebuild (activate/test) et le rollback restent des **caps futurs** (handoff).
-- Un miroir de `nix flake update --commit-lock-file`. Il lit le lock, il ne l'écrit pas.
+- An update manager. noosphere does **not** run `nix flake update`,
+  `nixos-rebuild switch/boot` or `rollback` (see the *read-only* invariant). It **shows**
+  the gap, and **previews** a build's closure — without ever activating.
+- An automatic builder. Since v0.2.0, noosphere can **build a toplevel on demand** (a
+  button) for a preview `nvd diff`, but never in the background, and without activation.
+  The rebuild timeline (activate/test) and rollback remain **future caps** (handoff).
+- A mirror of `nix flake update --commit-lock-file`. It reads the lock, it does not write it.
 
-Aujourd'hui un seul flake est configuré, mais rien dans le modèle ne le suppose : voir
-l'invariant *agnostique au flake* ci-dessous.
+Today a single flake is configured, but nothing in the model assumes that: see the
+*flake-agnostic* invariant below.
 
 ---
 
-## Le pipeline — trois étages
+## The pipeline — three stages
 
-noosphere est une transformation à trois étages. Chaque étage a un contrat clair et est
-**indépendamment testable**. Rien ne traverse un étage qui ne devrait pas : la sortie
-brute de `nix`/GitHub n'entre pas dans la vue, le QML ne construit jamais de commande ni
-d'URL lui-même.
+noosphere is a three-stage transformation. Each stage has a clear contract and is
+**independently testable**. Nothing crosses a stage that should not: raw `nix`/GitHub output
+does not enter the view, and the QML never builds a command or a URL itself.
 
 ```
-  flake local + GitHub                                 popup Quickshell
+  local flake + GitHub                                 popup Quickshell
       │                                                        ▲
       ▼                                                        │
   ┌────────┐        ┌─────────────┐        ┌──────────────────┐
   │ query  │  ───▶  │ model       │  ───▶  │ view             │
   │ (argv/ │        │ (inputs /   │        │ (QML / Material) │
-  │  URL)  │        │  dérive)    │        │                  │
+  │  URL)  │        │  drift)     │        │                  │
   └────────┘        └─────────────┘        └──────────────────┘
 ```
 
-### 1. `query` — construction des commandes & URLs
+### 1. `query` — building commands & URLs
 
-Construit l'**argv** de `nix flake metadata --json` et l'**URL** de l'API compare de
-GitHub — des fonctions **pures**, **sans aucun secret**. On retourne un **tableau
-d'arguments** (jamais une ligne shell : pas d'injection, la requête reste un élément), et
-une URL construite à partir de `owner/repo/base/head`. Ne connaît ni le réseau ni la
-présentation. L'exécution (Process `nix`, `GET` HTTP émis par le processus lui-même) est le
-travail du **service** (`Noosphere.qml`), pas de cette couche.
+Builds the **argv** for `nix flake metadata --json` and the **URL** for GitHub's compare
+API — **pure** functions, **with no secret whatsoever**. We return an **argument array**
+(never a shell line: no injection, the request stays one element), and a URL built from
+`owner/repo/base/head`. It knows neither the network nor the presentation. Execution
+(`Process` running `nix`, the HTTP `GET` issued by the process itself) is the **service**'s
+job (`Noosphere.qml`), not this layer's.
 
-> **L'auth vit dans un header, pas dans l'URL.** Le token GitHub (optionnel, pour lever la
-> limite de 60 req/h) passe par le header HTTP `Authorization: Bearer <token>`, injecté par
-> le service. Conséquence directe : les URLs construites par `query` (et donc les
-> **fixtures golden**) ne contiennent jamais de token — committables sans risque.
+> **Auth lives in a header, not in the URL.** The GitHub token (optional, to lift the
+> 60 req/h limit) travels in the `Authorization: Bearer <token>` HTTP header, injected by
+> the service. Direct consequence: the URLs built by `query` (and therefore the **golden
+> fixtures**) never contain a token — committable without risk.
 
-### 2. `model` — modèle de domaine
+### 2. `model` — the domain model
 
-Transforme la sortie de `nix flake metadata` et les réponses compare de GitHub en
-**modèle de dérive** : la liste des **inputs directs** (nom, canal, révision verrouillée,
-date de lock, owner/repo), chacun annoté de son **retard** (`behind` = commits d'écart sur
-l'amont). Tient l'état applicatif : `inputs`, `behindCount`, `barState`
-(`uptodate | drift`), `connectionStatus`, `lastCheck`. **Pur et testable** : mêmes entrées
-→ même modèle (cf. golden tests, PROCEDURE_PLANS.md).
+Turns `nix flake metadata`'s output and GitHub's compare responses into a **drift model**:
+the list of **direct inputs** (name, channel, locked revision, lock date, owner/repo), each
+annotated with how far **behind** it is (`behind` = commits of gap against upstream). It
+holds the application state: `inputs`, `behindCount`, `barState` (`uptodate | drift`),
+`connectionStatus`, `lastCheck`. **Pure and testable**: same inputs → same model (see the
+golden tests, PROCEDURE_PLANS.md).
 
-Les helpers de **présentation** (temps relatif « il y a 9 j », couleur d'état, URL web de
-comparaison pour le lien changelog) vivent dans `format.js`, **hors du modèle golden**
-(dérivables / dépendants de « maintenant »).
+The **presentation** helpers (relative time « il y a 9 j », state colour, the web
+compare URL for the changelog link) live in `format.js`, **outside the golden model**
+(derivable / dependent on *now*).
 
-### 3. `view` — rendu Quickshell
+### 3. `view` — Quickshell rendering
 
-QML / Qt Quick. Consomme le modèle, ne construit ni n'exécute jamais de commande en
-direct. Porte le système visuel ci-dessous, en réutilisant les composants Material 3 de
-DankMaterialShell.
+QML / Qt Quick. Consumes the model; never builds or runs a command directly. It carries the
+visual system below, reusing DankMaterialShell's Material 3 components.
 
-### Implémentation
+### Implementation
 
-noosphere est un **plugin DankMaterialShell** (`plugin.json` à la racine + `src/`),
-installé dans `~/.config/DankMaterialShell/plugins/Noosphere/`. Il hérite du thème
-(Catppuccin Mocha) et des composants Material 3 de DMS.
+noosphere is a **DankMaterialShell plugin** (`plugin.json` at the root + `src/`), installed
+into `~/.config/DankMaterialShell/plugins/Noosphere/`. It inherits DMS's theme (Catppuccin
+Mocha) and Material 3 components.
 
-- `query` → `src/query/queries.js` : `flakeMetadata()` / `compareApiUrl()` / `repoApiUrl()`
-  (dérive), `buildToplevel()` / `nvdDiff()` / `hostnameArgv()` (diff de closure), fonctions
-  pures. Exécutées par les services (Process `nix` et `nvd` ; les URLs GitHub sont
-  interrogées par `XMLHttpRequest`, sans processus externe).
-- `model` → `src/model/inputs.js` (dérive : `parseMetadata`, `parseCompare`, `mergeBehind`,
-  `behindCount`, `barState`, rattachement des réponses : `compareBelongsTo`, `repoBelongsTo`,
-  cause d'un échec d'appel : `githubError`)
+- `query` → `src/query/queries.js`: `flakeMetadata()` / `compareApiUrl()` / `repoApiUrl()`
+  (drift), `buildToplevel()` / `nvdDiff()` / `hostnameArgv()` (closure diff), pure
+  functions. Run by the services (`Process` for `nix` and `nvd`; GitHub URLs are queried by
+  `XMLHttpRequest`, with no external process).
+- `model` → `src/model/inputs.js` (drift: `parseMetadata`, `parseCompare`, `mergeBehind`,
+  `behindCount`, `barState`, attributing responses: `compareBelongsTo`, `repoBelongsTo`,
+  the cause of a failed call: `githubError`)
   + `src/model/closure.js` (`parseNvdDiff`, `closureSeverity`,
-  `cardSeverity`) + `format.js` (helpers de présentation, **hors** modèle golden). Pur, testé
-  par goldens + inline (`tests/`, `just test` / `just bless`).
-- `view` → `src/view/` : services `Noosphere` (poll dérive) et `Closure` (build+diff à la
-  demande) ; `NoosphereWidget` (barre + badge), `NoosphereGlyph` (glyphe), `Cockpit` (popout :
-  cartes EN-TÊTE + INPUTS + DIFF DE CLOSURE), `ClosureCard` (carte diff), `Settings` (config).
-  Thème = DMS.
+  `cardSeverity`) + `format.js` (presentation helpers, **outside** the golden model). Pure,
+  tested by goldens + inline (`tests/`, `just test` / `just bless`).
+- `view` → `src/view/`: the `Noosphere` (drift poll) and `Closure` (on-demand build+diff)
+  services; `NoosphereWidget` (bar + badge), `NoosphereGlyph` (glyph), `Cockpit` (popout:
+  header + INPUTS + DIFF DE CLOSURE cards), `ClosureCard` (diff card), `Settings` (config).
+  Theme = DMS.
 
-#### Le transport HTTP reste dans le processus
+#### HTTP transport stays inside the process
 
-Les appels à l'API GitHub sont émis par le service en `XMLHttpRequest`, **jamais** par un
-client externe. La raison est le secret : passé à un processus, le token voyagerait dans
-son argv, donc dans `/proc/<pid>/cmdline`, lisible par tout processus local. Un header posé
-depuis le processus ne sort jamais de sa mémoire. C'est le corollaire d'exécution de la
-règle « l'auth vit dans un header » énoncée plus haut.
+Calls to GitHub's API are issued by the service through `XMLHttpRequest`, **never** by an
+external client. The reason is the secret: handed to a process, the token would travel in
+its argv, hence in `/proc/<pid>/cmdline`, readable by any local process. A header set from
+within the process never leaves its memory. This is the execution corollary of the *auth
+lives in a header* rule stated above.
 
-Ce que ce transport apporte accessoirement : le **statut HTTP** est lisible (donc la cause
-d'un échec est nommable — `githubError`), les **redirections** sont suivies (un dépôt
-renommé cesse de casser en silence), et chaque requête étant un objet distinct, la réponse
-est rattachée à son input par sa closure plutôt que par un état partagé.
+What this transport brings incidentally: the **HTTP status** is readable (so the cause of a
+failure can be named — `githubError`), **redirects** are followed (a renamed repository
+stops breaking silently), and since each request is a distinct object, a response is
+attributed to its input through its closure rather than through shared state.
 
-Ce qu'il n'apporte pas de lui-même, et qui reste un **cap futur** (décision + PLAN dédiés,
-cf. `.claude/plans/TODO.md`) :
+What it does not bring by itself, and which remains a **future cap** (a dedicated decision
+and plan; tracked in GitHub Issues):
 
-| Piste | Gain | Coût |
+| Track | Gain | Cost |
 |---|---|---|
-| Requêtes conditionnelles `If-None-Match` / `ETag` | économie de quota, décisive **sans** token (60 req/h face à ~15 requêtes par poll) | un cache mémoire d'ETags, à invalider — et à ne pas persister (inv. 1) |
-| Compare en parallèle | latence d'un poll séquentiel | contrôle de concurrence, un délai par requête en vol, conduite de rate-limit à repenser |
+| Conditional requests `If-None-Match` / `ETag` | quota savings, decisive **without** a token (60 req/h against ~15 requests per poll) | an in-memory ETag cache, to invalidate — and not to persist (inv. 1) |
+| Compares in parallel | the latency of a sequential poll | concurrency control, one timer per in-flight request, rate-limit conduct to rethink |
 
-Le **séquentiel reste le choix par défaut** : budget de requêtes maîtrisé, et une seule
-requête en vol à la fois se raisonne sans effort.
-
----
-
-## Invariants du domaine
-
-1. **Le flake local + GitHub font foi ; rien côté serveur.** Toute donnée affichée vient
-   de `nix flake metadata --json` (état verrouillé) et de l'API compare GitHub (amont). Pas
-   de cache parallèle persistant, aucune configuration côté serveur.
-2. **Lecture seule — observe, n'active pas.** noosphere lit l'état système et peut, **à la
-   demande explicite de l'utilisateur**, **builder** un toplevel (`nix build …#…toplevel`,
-   depuis v0.2.0) pour en prévisualiser la closure : un build construit des dérivations et
-   télécharge, mais **n'active rien** — pas de `switch`/`boot`, pas de nouvelle génération,
-   pas de bascule du profil. Restent **hors périmètre** (décision DESIGN + PLAN dédié à
-   chaque fois) : `nix flake update` (écriture du `flake.lock`), `nixos-rebuild switch/boot`,
-   `rollback`. Le build **n'est jamais automatique** (jamais déclenché par un poll) : trop
-   lourd, et une action système ne se déclenche que sur intention explicite.
-3. **L'input est l'unité.** Le modèle raisonne en **inputs directs** du flake (ceux
-   déclarés à la racine : `.locks.nodes[root].inputs`), pas en nœuds transitifs. Un input =
-   un nom, un canal, une révision verrouillée, une date de lock, un retard. Le graphe de
-   lock complet est un détail de la couche `query`, pas du domaine.
-4. **Le retard se mesure sur l'amont GitHub.** `behind` d'un input = `ahead_by` du compare
-   `<lockRev>...<branche amont>` (nombre de commits dont l'amont est en avance sur le lock).
-   Seuls les inputs de `type == "github"` sont comparés ; les autres types sont **affichés,
-   jamais comparés** (retard indéterminé, jamais compté comme dérive).
-5. **Token GitHub optionnel, et secret.** Sans token, l'API publique suffit (limite 60
-   req/h). Avec token (header `Authorization: Bearer`), la limite monte. Le token est un
-   secret : il vit dans la config/le service, **jamais** dans les couches `query`/`model`
-   ni dans les fixtures/goldens.
-6. **Agnostique au flake.** noosphere ne modélise pas les flakes comme des entités de
-   premier plan : un flake n'est qu'une **facette** (chemin + owner/repo + branche + token).
-   Mono ou multi-flake se modélisent sans traitement spécial — une future vue multi-flake
-   sera un PLAN si le besoin émerge.
-7. **Best-effort sur la connexion.** L'état (`live | polling | error`) est *observé*. Un
-   flake introuvable, `nix` lent, GitHub injoignable ou rate-limité **dégrade l'affichage**
-   (dernier état connu + statut d'erreur, badge en gris), ne fait **jamais** planter le widget.
-8. **Déterminisme de la couche données.** `query` + `model` sont déterministes pour un jeu
-   d'entrées figé (sortie `nix flake metadata` + réponses compare + sortie `nvd diff`) —
-   c'est ce qui rend les golden tests possibles. `behind`/`behindCount`/`barState` et
-   `parseNvdDiff`/`closureSeverity`/`cardSeverity` sont des fonctions pures.
-9. **La closure prévisualise une mise à jour, sans muter (v0.2.0).** Le diff de closure
-   compare `/run/current-system` (génération courante) à un **toplevel buildé à la demande**
-   avec les inputs **en retard pointés sur leur amont** via `--override-input`
-   (`github:<owner>/<repo>/<ref>`) : on évalue « comme si mis à jour » **sans écrire
-   `flake.lock`** et **sans activer**. Aucun input en retard → rien à prévisualiser. Le build
-   n'est jamais automatique. `nvd` est une **dépendance déclarée** (devShell + module
-   home-manager + `plugin.json`). La sévérité d'un changement est une **heuristique locale** :
-   kernel/firmware/pilote → `reboot` (badge REBOOT) ; les badges **CVE** sont **reportés**
-   (aucune source d'avis de sécurité fiable en local). Le liseré prend la sévérité maximale.
-10. **Une réponse appartient à l'input qui l'a demandée (v0.2.1).** Le poll interroge GitHub
-    **séquentiellement**, une étape à la fois. Contrat : **une étape = une requête = une
-    avance**. L'input est capturé au moment de l'émission — jamais relu depuis un curseur au
-    retour —, et chaque réponse est **rattachée** à lui (`compareBelongsTo` sur
-    `base_commit.sha`, `repoBelongsTo` sur `full_name`) avant d'être exploitée. Une réponse
-    orpheline est **jetée**, jamais devinée : attribuer le retard d'un input à son voisin est
-    pire que ne rien afficher. Un chien de garde borne chaque étape, de sorte qu'un poll rende
-    toujours la main : sans quoi un re-check manuel resterait sans effet.
-11. **L'affichage ne se contredit jamais lui-même.** Deux cartes qui décrivent le même état ne
-    peuvent pas l'énoncer différemment. Un input en retard mais non prévisualisable (amont non
-    résolu) est **nommé comme tel** par la carte de closure ; « aucun input en retard » est
-    réservé au cas où il n'y en a réellement aucun. Corollaire de l'invariant 7 : dégrader
-    l'affichage est permis, mentir ne l'est pas.
+**Sequential remains the default choice**: a controlled request budget, and a single
+in-flight request at a time is reasoned about effortlessly.
 
 ---
 
-## Système visuel
+## Domain invariants
 
-Hérité de DankMaterialShell (Material 3, Catppuccin Mocha) et défini au pixel par le
-handoff design (`tmp/design_handoff_noosphere/Noosphere.dc.html`, non commité). Les
-**valeurs durables** sont recopiées ci-dessous pour survivre.
+1. **The local flake + GitHub are authoritative; nothing server-side.** Every displayed
+   datum comes from `nix flake metadata --json` (locked state) and GitHub's compare API
+   (upstream). No parallel persistent cache, no server-side configuration.
+2. **Read-only — observe, do not activate.** noosphere reads the system state and may, **at
+   the user's explicit request**, **build** a toplevel (`nix build …#…toplevel`, since
+   v0.2.0) to preview its closure: a build constructs derivations and downloads, but
+   **activates nothing** — no `switch`/`boot`, no new generation, no profile switch. These
+   stay **out of scope** (a DESIGN decision + a dedicated plan each time):
+   `nix flake update` (writing `flake.lock`), `nixos-rebuild switch/boot`, `rollback`. The build is
+   **never automatic** (never triggered by a poll): too heavy, and a system action is only
+   triggered on explicit intent.
+3. **The input is the unit.** The model reasons in the flake's **direct inputs** (those
+   declared at the root: `.locks.nodes[root].inputs`), not in transitive nodes. One input =
+   a name, a channel, a locked revision, a lock date, a number of commits behind. The full
+   lock graph is a detail of the `query` layer, not of the domain.
+4. **How far behind is measured against GitHub upstream.** An input's `behind` = `ahead_by` of the
+   compare `<lockRev>...<upstream branch>` (the number of commits by which upstream is ahead
+   of the lock). Only inputs of `type == "github"` are compared; other types are
+   **displayed, never compared** (behind indeterminate, never counted as drift).
+5. **GitHub token optional, and secret.** Without a token, the public API is enough (60
+   req/h limit). With a token (`Authorization: Bearer` header), the limit rises. The token is
+   a secret: it lives in the config / the service, **never** in the `query`/`model` layers
+   nor in the fixtures/goldens.
+6. **Flake-agnostic.** noosphere does not model flakes as first-class entities: a flake is
+   only a **facet** (path + owner/repo + branch + token). Single- or multi-flake are modelled
+   with no special handling — a future multi-flake view will be a plan if the need emerges.
+7. **Best-effort on the connection.** The state (`live | polling | error`) is *observed*. A
+   flake that cannot be found, a slow `nix`, GitHub unreachable or rate-limited **degrades
+   the display** (last known state + error status, grey badge), and **never** crashes the
+   widget.
+8. **Determinism of the data layer.** `query` + `model` are deterministic for a frozen set
+   of inputs (`nix flake metadata` output + compare responses + `nvd diff` output) — that is
+   what makes the golden tests possible. `behind`/`behindCount`/`barState` and
+   `parseNvdDiff`/`closureSeverity`/`cardSeverity` are pure functions.
+9. **The closure previews an update, without mutating (v0.2.0).** The closure diff compares
+   `/run/current-system` (the current generation) against a **toplevel built on demand**
+   with the inputs that are **behind pointed at their upstream** through `--override-input`
+   (`github:<owner>/<repo>/<ref>`): we evaluate *as if updated* **without writing
+   `flake.lock`** and **without activating**. No input behind → nothing to preview. The
+   build is never automatic. `nvd` is a **declared dependency** (devShell + home-manager
+   module + `plugin.json`). A change's severity is a **local heuristic**:
+   kernel/firmware/driver → `reboot` (REBOOT badge); **CVE** badges are **deferred** (no
+   reliable local source of security advisories). The edge takes the maximum severity.
+10. **A response belongs to the input that asked for it (v0.2.1).** The poll queries GitHub
+    **sequentially**, one step at a time. Contract: **one step = one request = one
+    advance**. The input is captured at emission time — never re-read from a cursor on
+    return — and each response is **attributed** to it (`compareBelongsTo` on
+    `base_commit.sha`, `repoBelongsTo` on `full_name`) before being used. An orphan response
+    is **discarded**, never guessed: attributing how far behind one input is to its neighbour is worse
+    than displaying nothing. A watchdog bounds each step, so that a poll always hands control
+    back: without it, a manual re-check would stay without effect.
+11. **The display never contradicts itself.** Two cards describing the same state cannot
+    state it differently. An input that is behind but not previewable (upstream unresolved) is
+    **named as such** by the closure card; « aucun input en retard » is reserved
+    for the case where there really is none. A corollary of invariant 7: degrading the
+    display is allowed, lying is not.
 
-> **Fidélité : high (hifi).** Couleurs, tailles, espacements et états sont définitifs.
-> Seule liberté : la **police** — police système du shell pour le texte, mono du shell
-> (JetBrains Mono / Fira Code) pour tout ce qui est marqué mono.
+---
+
+## Visual system
+
+Inherited from DankMaterialShell (Material 3, Catppuccin Mocha) and defined to the pixel by
+the design handoff (`tmp/design_handoff_noosphere/Noosphere.dc.html`, not committed). The
+**durable values** are copied below so they survive.
+
+> **Fidelity: high (hifi).** Colours, sizes, spacings and states are final. The only
+> freedom: the **font** — the shell's system font for text, the shell's mono (JetBrains Mono
+> / Fira Code) for everything marked mono.
+
+> **On the French strings quoted in this section.** The UI copy is French **today**, and the
+> literals quoted below are the exact strings currently rendered by `src/`. They are quoted,
+> not translated, so this document keeps describing the interface that actually exists.
+> English is noosphere's default language and the UI will follow, with EN/FR
+> internationalisation, under its own plan — see `PROCEDURE_PLANS.md`. Until then, a French
+> literal here is deliberate, not a missed translation.
 
 ### Palette — Catppuccin Mocha
 
-| Rôle | Hex |
+| Role | Hex |
 |---|---|
-| Base / fond popup | `#1e1e2e` |
-| Mantle / fond console, boutons secondaires | `#181825` |
-| Surface0 / cartes | `#313244` |
-| Surface1 / bordures | `#45475a` |
-| Surface2 / bordure hover | `#585b70` |
-| Overlay0 / texte tertiaire | `#6c7086` |
-| Subtext0 / texte secondaire | `#a6adc8` |
+| Base / popup background | `#1e1e2e` |
+| Mantle / console background, secondary buttons | `#181825` |
+| Surface0 / cards | `#313244` |
+| Surface1 / borders | `#45475a` |
+| Surface2 / hover border | `#585b70` |
+| Overlay0 / tertiary text | `#6c7086` |
+| Subtext0 / secondary text | `#a6adc8` |
 | Text | `#cdd6f4` |
-| **Vert — à jour / succès** | `#a6e3a1` |
-| **Jaune — dérive** | `#f9e2af` |
-| Pêche — attention / reboot / taille | `#fab387` |
-| Rouge — erreur / CVE / danger | `#f38ba8` |
+| **Green — up to date / success** | `#a6e3a1` |
+| **Yellow — drift** | `#f9e2af` |
+| Peach — attention / reboot / size | `#fab387` |
+| Red — error / CVE / danger | `#f38ba8` |
 | Mauve — rebuild | `#cba6f7` |
-| **Bleu — identité / actions neutres / liens** | `#89b4fa` |
-| Bleu hover | `#a6c4fc` / `#b4befe` |
+| **Blue — identity / neutral actions / links** | `#89b4fa` |
+| Blue hover | `#a6c4fc` / `#b4befe` |
 
-### Mapping couleur des états (impératif)
+### State colour mapping (imperative)
 
-Le pilier visuel de noosphere. La couleur du **badge de barre** encode l'état de dérive :
+noosphere's visual pillar. The **bar badge**'s colour encodes the drift state:
 
-| État (`barState`) | Couleur glyphe | Pastille | Sens |
+| State (`barState`) | Glyph colour | Pill | Meaning |
 |---|---|---|---|
-| `uptodate` | Bleu `#89b4fa` | masquée | tous les inputs à jour |
-| `drift` | Jaune `#f9e2af` | fond jaune, chiffre = nb d'inputs en retard | au moins un input dérive |
-| `rebuilding` *(cap futur, non atteint en v1)* | Mauve `#cba6f7` | masquée | rebuild en cours |
+| `uptodate` | Blue `#89b4fa` | hidden | every input up to date |
+| `drift` | Yellow `#f9e2af` | yellow background, figure = number of inputs behind | at least one input is drifting |
+| `rebuilding` *(future cap, not reached in v1)* | Mauve `#cba6f7` | hidden | rebuild in progress |
 
-Dans la carte INPUTS, chaque ligne porte un **point d'état** : jaune `#f9e2af` si en
-retard, vert `#a6e3a1` si à jour. Le texte de retard est jaune (« N commits en retard »)
-ou gris `#6c7086` (« à jour »).
+In the INPUTS card, each row carries a **state dot**: yellow `#f9e2af` if behind, green
+`#a6e3a1` if up to date. The behind label is yellow (« N commits en retard ») or grey
+`#6c7086` (« à jour »).
 
-### Formes & profondeur
+### Shapes & depth
 
-- **Badge de barre** : hauteur 28px, rayon 8, fond `#313244`, bord 1px `#45475a`.
-- **Popup** : largeur 440px, rayon 18, fond `#1e1e2e`, bord 1px `#313244`, padding 14,
-  ombre `0 24px 60px rgba(0,0,0,.55)`, gap entre cartes 11.
-- **Cartes** : fond `#313244`, rayon 13, padding 13–15, **liseré gauche 3px** coloré par
-  sévérité (`inset 3px 0 0 <couleur>`). Titres de carte : mono 11px/600, letter-spacing
-  `.13em`, majuscules, colorés comme le liseré, précédés d'une icône 13px.
-- Rayons : 5 (micro-badges) · 7 (mini-boutons) · 8 (lignes, badge, pastille) · 9 (boutons,
-  blocs) · 13 (cartes) · 18 (popup) · 20 (chips) · 50 % (points, cercles).
-- Typo : **police système** (UI) ; **mono du shell** (noms d'input, révisions, retards,
-  chips, titres de carte) ; **Material Symbols** pour les icônes (`sync`, `download`,
-  `fork_right`, `schedule`, `settings`, `deployed_code`, `refresh`, `check`, `undo`).
+- **Bar badge**: height 28px, radius 8, background `#313244`, 1px `#45475a` border.
+- **Popup**: width 440px, radius 18, background `#1e1e2e`, 1px `#313244` border, padding 14,
+  shadow `0 24px 60px rgba(0,0,0,.55)`, 11 gap between cards.
+- **Cards**: background `#313244`, radius 13, padding 13–15, **3px left edge** coloured by
+  severity (`inset 3px 0 0 <colour>`). Card titles: mono 11px/600, letter-spacing `.13em`,
+  uppercase, coloured like the edge, preceded by a 13px icon.
+- Radii: 5 (micro-badges) · 7 (mini-buttons) · 8 (rows, badge, pill) · 9 (buttons, blocks) ·
+  13 (cards) · 18 (popup) · 20 (chips) · 50 % (dots, circles).
+- Type: **system font** (UI); **the shell's mono** (input names, revisions, behind counts, chips, card
+  titles); **Material Symbols** for icons (`sync`, `download`, `fork_right`, `schedule`,
+  `settings`, `deployed_code`, `refresh`, `check`, `undo`).
 
 ### Animations
 
-- `spin` (rotation, .9s spinner / 3s glyphe) et `pulseGlow` (halo mauve, 1,8s) — **réservés
-  à l'état `rebuilding`**, donc **non déclenchés en v1**. Transitions de hover de ligne et
-  d'apparition des actions : 120 ms. Aucune autre animation en v1.
+- `spin` (rotation, .9s spinner / 3s glyph) and `pulseGlow` (mauve halo, 1.8s) — **reserved
+  for the `rebuilding` state**, hence **not triggered in v1**. Row hover and action-reveal
+  transitions: 120 ms. No other animation in v1.
 
-### Direction visuelle — cockpit
+### Visual direction — cockpit
 
-Un mini-cockpit de dérive. Layout de référence (le prototype HTML détaille le pixel-perfect) :
+A small drift cockpit. Reference layout (the HTML prototype details the pixel-perfect form):
 
-- **Popup 440px**, colonne de cartes, gap 11.
-- **Carte EN-TÊTE** (liseré `#89b4fa`) : glyphe 22px + « noosphere » (16px/700 `#cdd6f4`) et
-  `owner/repo` (mono 12px `#89b4fa`) ; à droite, chip branche (icône `fork_right` + nom,
-  fond `#1e1e2e`, bord `#45475a`). Ligne 2 : point vert + génération (« n°N · activée il y a
-  … ») ; à droite « check amont · il y a … » `#6c7086`.
-- **Carte INPUTS** (liseré `#f9e2af`, le cœur du widget) : en-tête « INPUTS » + « N en retard
-  · M à jour » à droite. Une ligne par input : point d'état · nom (mono 13px/600) · chip de
-  canal optionnel (mono 10,5px `#6c7086`) · « lock <âge> » ; à droite, texte de retard (mono
-  11px/600, min-width 104, aligné à droite). **Hover** d'une ligne en retard : fond
-  `rgba(255,255,255,.045)` + apparition (120ms) du lien **changelog** (`#89b4fa`, ouvre le
-  compare GitHub web) — **lecture seule**.
+- **440px popup**, a column of cards, gap 11.
+- **Header card** (`#89b4fa` edge): 22px glyph + « noosphere » (16px/700
+  `#cdd6f4`) and `owner/repo` (mono 12px `#89b4fa`); on the right, a branch chip
+  (`fork_right` icon + name, `#1e1e2e` background, `#45475a` border). Row 2: green dot +
+  generation (« n°N · activée il y a … »); on the right « check amont · il y a
+  … » `#6c7086`.
+- **INPUTS card** (`#f9e2af` edge, the heart of the widget): header « INPUTS » +
+  « N en retard · M à jour » on the right. One row per input: state dot · name
+  (mono 13px/600) · optional channel chip (mono 10.5px `#6c7086`) ·
+  « lock <age> »; on the right, the behind label (mono 11px/600, min-width 104,
+  right-aligned). **Hover** on a row that is behind: background `rgba(255,255,255,.045)` +
+  a 120ms reveal of the **changelog** link (`#89b4fa`, opens GitHub's web compare) —
+  **read-only**.
 
-- **Carte DIFF DE CLOSURE** (liseré pêche `#fab387` si un changement `reboot`, sinon neutre
-  `#45475a` ; rouge `#f38ba8` si erreur) — **aperçu de mise à jour** : `nvd diff` entre
-  `/run/current-system` et un toplevel **buildé à la demande, inputs en retard pointés sur
-  l'amont** (`--override-input`, sans écrire le lock). Titre : icône `deployed_code` + « DIFF
-  DE CLOSURE ».
-  - **idle** : bouton « prévisualiser la mise à jour (N) » (`#89b4fa`) si N inputs en retard ;
-    sinon note « aucun input en retard ». La carte est vide tant qu'on n'a pas buildé (jamais
-    automatique).
-  - **building / diffing** : spinner mauve `#cba6f7` + libellé d'étape.
-  - **ready** : ligne résumé (mono 12px, segments séparés par « · » `#6c7086`) « N màj »
-    `#f9e2af` · « A ajoutés » `#a6e3a1` · « R retirés » `#f38ba8` · « Δ <taille> » `#fab387` ;
-    puis bloc console `#181825` (radius 9, mono 12px) : par entrée `nom  <from>  →  <to>`
-    (versions `#6c7086`, nouvelle `#cdd6f4`). Entrée `reboot` : nom pêche `#fab387`, marqueur
-    ▲, badge droit **REBOOT** (mono 9,5px, `#fab387` sur `rgba(250,179,135,.14)`).
-  - **error** : liseré rouge + message (extrait de la sortie `nix`/`nvd`).
+- **DIFF DE CLOSURE card** (peach `#fab387` edge if a `reboot` change, otherwise neutral
+  `#45475a`; red `#f38ba8` on error) — **update preview**: `nvd diff` between
+  `/run/current-system` and a toplevel **built on demand, with the inputs that are behind
+  pointed at upstream** (`--override-input`, without writing the lock). Title:
+  `deployed_code` icon + « DIFF DE CLOSURE ».
+  - **idle**: a « prévisualiser la mise à jour (N) » button (`#89b4fa`) if N inputs
+    are behind; otherwise the note « aucun input en retard ». The card is empty
+    until a build has run (never automatic).
+  - **building / diffing**: mauve `#cba6f7` spinner + the step's label.
+  - **ready**: a summary row (mono 12px, segments separated by `·` `#6c7086`)
+    « N màj » `#f9e2af` · « A ajoutés » `#a6e3a1` ·
+    « R retirés » `#f38ba8` · « Δ <size> » `#fab387`; then a `#181825`
+    console block (radius 9, mono 12px): per entry `name  <from>  →  <to>` (versions
+    `#6c7086`, the new one `#cdd6f4`). A `reboot` entry: peach `#fab387` name, ▲ marker, a
+    right-hand **REBOOT** badge (mono 9.5px, `#fab387` on `rgba(250,179,135,.14)`).
+  - **error**: red edge + a message (an excerpt of `nix`/`nvd` output).
 
-> **Reporté.** Badges **CVE** (nécessitent une source d'avis de sécurité — pas de source
-> locale fiable) ; visionneuse « voir les N changements » externe (la console montre déjà
-> tout) ; boutons « update » / « Tout mettre à jour » (`nix flake update`) ; carte **REBUILD**
-> (timeline update→build→activate→test + rollback). Ces derniers **mutent** et deviendront des
-> PLANs dédiés une fois actés en DESIGN. Le glyphe en rotation (`rebuilding`) n'est pas déclenché.
+> **Deferred.** **CVE** badges (they need a source of security advisories — no reliable local
+> source); an external *view the N changes* viewer (the console already shows everything);
+> *update* / *Update all* buttons (`nix flake update`); a **REBUILD** card (an
+> update→build→activate→test timeline + rollback). The latter **mutate** and will become
+> dedicated plans once settled in DESIGN. The rotating glyph (`rebuilding`) is not triggered.
 
-### États annexes
+### Secondary states
 
-- **À jour (zen)** : badge bleu, pastille masquée ; carte INPUTS « 0 en retard · M à jour »,
-  tous les points verts.
-- **Chargement (check en cours)** : colonnes « retard » en placeholder gris `#6c7086`, liste
-  **non vidée** (on garde le dernier état connu).
-- **Erreur** (flake introuvable, GitHub injoignable/rate-limité) : liseré de la carte INPUTS
-  en rouge `#f38ba8`, ligne de statut « échec du check · réessayer », badge de barre en gris
-  `#6c7086` gardant la dernière valeur connue.
+- **Up to date (zen)**: blue badge, pill hidden; INPUTS card « 0 en retard · M à
+  jour », every dot green.
+- **Loading (check in progress)**: the behind columns in grey `#6c7086` placeholder, the list
+  **not emptied** (we keep the last known state).
+- **Error** (flake not found, GitHub unreachable/rate-limited): the INPUTS card's edge in red
+  `#f38ba8`, a status row « échec du check · réessayer », the bar badge in grey
+  `#6c7086` keeping its last known value.
 
 ---
 
-## Clin d'œil Adeptus Mechanicus
+## Adeptus Mechanicus nod
 
-Subtil, jamais kitsch. La **noosphère** est le réseau d'information du Mechanicus ; le
-glyphe du plugin est une **rosace/engrenage** (roue à 8 rayons + moyeu), rappel discret du
-cog mécanique. Vocabulaire sobre (« dérive », « amont », « verrou »). C'est un
-assaisonnement, pas un thème.
+Subtle, never kitsch. The **noosphere** is the Mechanicus's information network; the plugin's
+glyph is a **rosette/gear** (an 8-spoke wheel + hub), a discreet echo of the mechanical cog.
+Sober vocabulary: the project says « dérive », « amont », « verrou », not their flashier
+synonyms. These are the French terms the project reasons in — *drift*, *upstream*, *lock* —
+and they are named here as terms, not prescribed as English copy. It is a seasoning, not a
+theme.
