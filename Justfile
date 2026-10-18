@@ -20,9 +20,25 @@ fmt-check:
     done < <(find src -name '*.qml' -print0 2>/dev/null)
     exit $fail
 
-# Lint statique du QML (qmllint). Aucun warning toléré.
+# Static QML lint (qmllint), with every import resolved through Quickshell's own generated
+# VFS — see scripts/qml-import-paths for why `-I` alone cannot resolve DMS's qs.* modules.
+# NOT YET BLOCKING: qmllint exits 0 whatever it finds, and making this recipe fail is the
+# next step of the issues-pass plan. It reports, for now.
 lint:
-    @find src -name '*.qml' -print0 2>/dev/null | xargs -0 -r qmllint
+    #!/usr/bin/env bash
+    set -euo pipefail
+    # A failure here (DMS absent, quickshell absent, VFS unobtainable) aborts the recipe:
+    # linting a subset in silence is the defect this whole change exists to remove.
+    paths="$(scripts/qml-import-paths)"
+    args=()
+    while IFS= read -r p; do
+        case "$p" in /*) args+=(-I "$p") ;; esac
+    done <<<"$paths"
+    if [ ${#args[@]} -eq 0 ]; then
+        echo "lint: no import path resolved — refusing to lint without them" >&2
+        exit 1
+    fi
+    find src -name '*.qml' -print0 2>/dev/null | xargs -0 -r qmllint "${args[@]}"
 
 # Tests golden : qmltestrunner exécute les transforms JS sur fixtures → compare aux goldens.
 test:
