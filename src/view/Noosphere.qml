@@ -50,8 +50,8 @@ QtObject {
     property bool _busy: false
     property var _pending: null // requête HTTP en vol (une seule à la fois) : { xhr, timedOut, settled }
 
-    // Fabrique du transport. Seul point de substitution restant dans ce fichier : la
-    // production rend un vrai `XMLHttpRequest`, un test peut en rendre un faux.
+    // Transport factory. The one substitution point left in this file: production returns
+    // a real `XMLHttpRequest`, a test can return a fake.
     property var xhrFactory: function () {
         return new XMLHttpRequest();
     }
@@ -86,8 +86,8 @@ QtObject {
         genTimeProc.running = true;
     }
 
-    // Exécute un effet rendu par le driver. C'est le seul endroit où une décision du driver
-    // devient une action.
+    // Performs an effect returned by the driver. The only place a driver decision becomes
+    // an action.
     function _perform(eff) {
         if (!eff)
             return;
@@ -111,11 +111,11 @@ QtObject {
         }
     }
 
-    // Publie le modèle du poll. Le statut vient de `Poll.commitStatus()`, pas d'ici : un poll
-    // qui n'a **rien pu vérifier** publie quand même la liste fraîchement lue (le `nix flake
-    // metadata` a réussi, seule la moitié GitHub a échoué) mais sous statut d'erreur, et sans
-    // toucher `lastCheck`. Le badge est alors gris — `stateColor` dérive de
-    // `connectionStatus === "error"` — au lieu d'annoncer « à jour » sans l'avoir vérifié.
+    // Publishes the poll's model. The status comes from `Poll.commitStatus()`, not from
+    // here: a poll that could verify **nothing** still publishes the freshly read list
+    // (`nix flake metadata` succeeded, only the GitHub half failed) but under an error
+    // status, and without touching `lastCheck`. The badge then greys — `stateColor` derives
+    // from `connectionStatus === "error"` — instead of announcing "up to date" unverified.
     function _publish() {
         stepWatchdog.stop();
         var m = Poll.model(root._st);
@@ -242,6 +242,13 @@ QtObject {
         running: false
         stdout: StdioCollector {
             onStreamFinished: {
+                // The poll must still be running. Without this guard, a `nix` the watchdog
+                // has already given up on (`_failWith`, so `_busy` false and the status
+                // `error`) can answer afterwards and start a ghost poll: nothing bounds it
+                // any more, and its `_publish()` would clear the error status and stamp
+                // `lastCheck` — exactly what #7's fix exists to prevent.
+                if (!root._busy)
+                    return;
                 if (text && text.trim())
                     root._perform(Poll.begin(root._st, text));
                 // vide → échec, traité par onExited
@@ -253,8 +260,8 @@ QtObject {
         }
         // qmllint disable signal-handler-parameters
         // `exited(int, QProcess::ExitStatus)`: the second parameter is a C++ enum Quickshell
-        // does not register for QML, so qmllint cannot resolve it. Remove once upstream
-        // exposes ExitStatus in its qmltypes.
+        // does not register for QML, so qmllint cannot resolve it and warns on every such
+        // handler. Remove once upstream exposes ExitStatus in its qmltypes.
         onExited: code => {
             if (code !== 0 && root._busy)
                 root._perform(Poll.onMetaFailed(root._st, "flake illisible (nix " + code + ")"));

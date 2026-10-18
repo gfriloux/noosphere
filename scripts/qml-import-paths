@@ -52,13 +52,22 @@ dms_root="${dms_bin%/bin/dms}/share/quickshell/dms"
 
 command -v quickshell >/dev/null 2>&1 || die \
     "quickshell not found — enter the dev shell first: nix develop"
+qs_bin="$(readlink -f "$(command -v quickshell)")" || die "cannot resolve the quickshell binary"
 
 # --- Stable cache -----------------------------------------------------------------------
 
 cache="${XDG_CACHE_HOME:-$HOME/.cache}/noosphere/qml-lint"
 shell_root="$cache/shell"
-stamp="$cache/dms-source"
+stamp="$cache/source-key"
 ini="$shell_root/.qmlls.ini"
+
+# The cache key covers DMS *and* quickshell, because the generated .qmlls.ini bakes in the
+# store paths of Qt and Quickshell as well as DMS's modules. Keying on DMS alone meant a
+# `nix flake update` that bumped nixpkgs or quickshell left the gate linting against the
+# previous Qt — an API the plugin no longer runs on — for as long as those paths survived
+# garbage collection, and then failing confusingly once they did not.
+cache_key="$dms_root
+$qs_bin"
 
 generate() {
     rm -rf "$shell_root"
@@ -70,16 +79,16 @@ generate() {
     QT_QPA_PLATFORM=offscreen timeout 30 quickshell -p "$shell_root" >/dev/null 2>&1
     grep -q '^importPaths=' "$ini" 2>/dev/null ||
         die "quickshell did not populate $ini — cannot determine the import paths"
-    printf '%s\n' "$dms_root" >"$stamp"
+    printf '%s\n' "$cache_key" >"$stamp"
 }
 
 read_build_dir() {
     sed -n 's/^buildDir="\(.*\)"$/\1/p' "$ini" 2>/dev/null
 }
 
-# Regenerate when the cache is absent, when DMS has been updated (its store path moved), or
-# when the VFS is gone (tmpfs cleared by a reboot).
-if [ ! -f "$ini" ] || [ ! -f "$stamp" ] || [ "$(cat "$stamp" 2>/dev/null)" != "$dms_root" ]; then
+# Regenerate when the cache is absent, when DMS or quickshell has been updated (either store
+# path moved), or when the VFS is gone (tmpfs cleared by a reboot).
+if [ ! -f "$ini" ] || [ ! -f "$stamp" ] || [ "$(cat "$stamp" 2>/dev/null)" != "$cache_key" ]; then
     generate
 elif [ ! -d "$(read_build_dir)" ]; then
     generate

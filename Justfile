@@ -45,9 +45,24 @@ lint:
         exit 1
     fi
     mapfile -t files < <(find src -name '*.qml' | sort)
-    raw="$(qmllint "${args[@]}" "${files[@]}" 2>&1 || true)"
-    # qmllint exits 0 whatever it finds — that was this gate's bug. The gate is this filter
-    # plus the emptiness test below, never qmllint's exit code.
+    if [ ${#files[@]} -eq 0 ]; then
+        echo "lint: no QML file found under src/ — refusing to report a pass" >&2
+        exit 1
+    fi
+    set +e
+    raw="$(qmllint "${args[@]}" "${files[@]}" 2>&1)"
+    rc=$?
+    set -e
+    # A non-zero exit means the LINTER failed — missing binary, crash, bad argument — not
+    # that it found something. Judging only the output would let that pass green, which is
+    # the very shape of bug this gate exists to remove.
+    if [ "$rc" -ne 0 ]; then
+        printf '%s\n' "$raw" >&2
+        printf 'lint: qmllint exited %s — the linter did not run; this is not a pass\n' "$rc" >&2
+        exit 1
+    fi
+    # Conversely qmllint exits 0 whatever it *finds*, so the findings themselves are judged
+    # from its output, never from its exit code.
     #
     # Two classes are dropped as known-bogus, both artefacts of Quickshell synthesising its
     # module metadata instead of shipping qmldir files. Neither can hide anything about our
@@ -61,6 +76,9 @@ lint:
         printf 'lint: %s finding(s) — this gate blocks at zero\n' "$(printf '%s\n' "$findings" | grep -c .)" >&2
         exit 1
     fi
+    # Say so on success: a gate that is silent when it passes is indistinguishable from a
+    # gate that did not run.
+    printf 'lint: 0 findings over %s file(s), %s import path(s)\n' "${#files[@]}" "$(( ${#args[@]} / 2 ))"
 
 # Check plugin.json against DankMaterialShell's published schema (vendored under
 # tests/vendor/). The manifest is the only written contract between this plugin and its host,

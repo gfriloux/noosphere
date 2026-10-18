@@ -1,6 +1,10 @@
 ---
-# Hooks locaux. Appellent les mêmes gates que `just ci` et la CI — une seule
-# définition (le Justfile), trois déclencheurs. Installer avec `pre-commit install`.
+# Local hooks. They call the Justfile's gates — one definition, several triggers. Install
+# with `pre-commit install`.
+#
+# They are NOT the same set CI runs: CI calls `ci-hermetic`, which excludes `lint` because a
+# runner has no DankMaterialShell. Pre-commit is therefore the only automatic QML gate, which
+# is why its qmllint hook watches more than *.qml (see below).
 repos:
   - repo: local
     hooks:
@@ -22,11 +26,16 @@ repos:
         entry: just fmt-check
         files: \.qml$
         pass_filenames: false
+      # Widened beyond *.qml on purpose. CI cannot run this gate (no DMS on a runner), so
+      # pre-commit is the only automatic trigger — and lint resolution depends on more than
+      # the QML: the flake pins Qt and Quickshell, and the Justfile and the import-path
+      # script decide how they are found. Keyed on *.qml alone, a flake bump that removed a
+      # type would land on main unlinted and surface later for whoever next touched a .qml.
       - id: qmllint
         name: qmllint
         language: system
         entry: just lint
-        files: \.qml$
+        files: \.qml$|^flake\.(nix|lock)$|^Justfile$|^scripts/qml-import-paths$
         pass_filenames: false
       - id: check-manifest
         name: check-manifest

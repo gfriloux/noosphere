@@ -32,8 +32,8 @@ command -v dms >/dev/null || { echo "noosphere-dev : 'dms' introuvable sur le PA
 command -v jq  >/dev/null || { echo "noosphere-dev : 'jq' introuvable sur le PATH." >&2; exit 1; }
 command -v quickshell >/dev/null || { echo "noosphere-dev : 'quickshell' introuvable (entrer dans le dev shell : nix develop)." >&2; exit 1; }
 
-# Racine du shell DMS, résolue via le binaire installé — aucun hash du store codé en dur.
-# Même résolution que scripts/qml-import-paths.
+# DMS shell root, resolved through the installed binary — no store hash pinned.
+# Same resolution as scripts/qml-import-paths.
 dms_bin="$(readlink -f "$(command -v dms)")"
 dms_shell="${dms_bin%/bin/dms}/share/quickshell/dms"
 [ -d "$dms_shell" ] || { echo "noosphere-dev : racine du shell DMS introuvable ($dms_shell)." >&2; exit 1; }
@@ -59,14 +59,14 @@ echo "  → active 'Noosphere (dev)' dans CETTE instance (Settings → Plugins).
 echo "  → règle l'endpoint GitHub du plugin sur http://127.0.0.1:8385 (avec 'just mock')."
 echo "  (Ctrl-C pour arrêter l'instance dev.)"
 
-# On lance l'UI directement par `quickshell`, pas par `dms run`.
+# Launch the UI through `quickshell` directly, not through `dms run`.
 #
-# Pourquoi : depuis DMS 1.6, `dms run` démarre un *backend* Go et refuse d'en lancer un
-# second pour la même session (« dms already running for this session; refusing to start a
-# second instance »). Le garde-fou est légitime — un seul backend par session — mais il
-# empêchait toute instance dev dès que la barre quotidienne tournait, c'est-à-dire toujours.
+# Why: since DMS 1.6, `dms run` starts a Go *backend* and refuses a second one for the same
+# session ("dms already running for this session; refusing to start a second instance").
+# The guard is right — one backend per session — but it made a dev instance impossible to
+# start whenever the everyday bar was running, which is always.
 #
-# L'UI, elle, est un shell Quickshell ordinaire : on l'ouvre sur la racine du shell DMS, avec
-# nos XDG isolés pour que le dossier de plugins et le qmlcache restent séparés. Le backend
-# déjà actif sert les deux UIs. Conséquence assumée : deux barres à l'écran le temps du test.
+# The UI itself is an ordinary Quickshell shell, so open it on the DMS shell root with our
+# isolated XDG dirs, keeping the plugin directory and the qmlcache separate. The already
+# running backend serves both UIs. Accepted consequence: two bars on screen during a test.
 exec quickshell -p "$dms_shell" "$@"

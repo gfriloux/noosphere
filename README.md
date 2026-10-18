@@ -75,8 +75,10 @@ just ci        # full gate: fmt-check + lint + test
 > green CI run never implies the QML was checked.
 
 Other targets: `just test` (golden + Qt Quick Test), `just fmt` (formats the QML),
-`just bless` (regenerates the goldens — read the diff), `just changelog` (regenerates
-`CHANGELOG.md` through git-cliff). To try it visually without network or server:
+`just bless` (regenerates the goldens — read the diff), `just check-manifest` (`plugin.json`
+against DMS's published schema), `just changelog` (**prepends** the section for the version
+in `plugin.json`; it does not regenerate, so the published French sections survive). To try
+it visually without network or server:
 
 ```bash
 just mock       # mock of the GitHub compare API (drift | uptodate | ratelimit | error)
