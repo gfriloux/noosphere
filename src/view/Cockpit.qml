@@ -1,11 +1,11 @@
-// Cockpit noosphere — contenu du popout (lecture seule).
-// Deux cartes empilées : EN-TÊTE (identité du flake + branche + génération + dernier check)
-// et INPUTS (liste des inputs directs, retard sur l'amont, lien changelog au survol). Pied :
-// cadence + « check maintenant » (re-check, lecture seule). Les mutations (update, rebuild,
-// rollback) et les cartes diff de closure / rebuild sont reportées (cf. DESIGN.md).
+// noosphere's cockpit — the popout's content (read-only).
+// Stacked cards: a header (flake identity + branch + generation + last check) and INPUTS
+// (the direct inputs, their lag against upstream, a changelog link on hover). Footer: the
+// poll interval + a manual re-check, read-only. Mutations (update, rebuild, rollback) and
+// the rebuild card are deferred (see DESIGN.md).
 //
-// Découplé de NoosphereWidget : reçoit le service (`service`) et le composant racine
-// (`owner`). Ne construit ni n'exécute jamais de commande.
+// Decoupled from NoosphereWidget: it receives the service (`service`) and the root
+// component (`owner`). It never builds or runs a command.
 //
 // `ComponentBehavior: Bound`: the Repeater's delegate already declares
 // `required property var modelData`, so the pragma changes nothing for it — it only makes
@@ -26,13 +26,86 @@ PopoutComponent {
     property var closureService
     property var owner
 
-    // En-tête par défaut de PopoutComponent masqué : on porte nos propres cartes.
+    // PopoutComponent's default header is hidden: we carry our own cards.
     headerText: ""
 
     readonly property bool isError: service && service.connectionStatus === "error"
     readonly property var inputs: service ? service.inputs : []
 
-    // Horloge grossière pour rafraîchir les « il y a N … » (les âges bougent lentement).
+    // ---- Sentence composition ----
+    //
+    // The model layer returns state, never prose, so the wording lives here. English is the
+    // source: each literal below is also its own translation id, looked up in the table DMS
+    // loads from translations/<locale>.json. A sentence assembled from parts is wrapped
+    // WHOLE, with %1 placeholders, never as fragments — fragments cannot be reordered, and
+    // French frequently needs that.
+
+    function ageText(tsSeconds) {
+        var a = Format.relativeAgeParts(tsSeconds, cockpit.now);
+        if (a.unit === "now")
+            return I18n.trFor("noosphere", "just now");
+        if (a.unit === "minutes")
+            return I18n.trFor("noosphere", "%1 min ago").arg(a.value);
+        if (a.unit === "hours")
+            return I18n.trFor("noosphere", "%1 h ago").arg(a.value);
+        return I18n.trFor("noosphere", "%1 d ago").arg(a.value);
+    }
+
+    function behindText(behind) {
+        if (typeof behind !== "number")
+            return "—";
+        if (behind <= 0)
+            return I18n.trFor("noosphere", "up to date");
+        if (behind === 1)
+            return I18n.trFor("noosphere", "%1 commit behind").arg(behind);
+        return I18n.trFor("noosphere", "%1 commits behind").arg(behind);
+    }
+
+    // The status row's whole sentence. "nothing-verified" is a verdict, not a cause: when
+    // the poll also knows WHY nothing could be verified, both are said, which is what the
+    // pre-i18n wording did and what DESIGN invariant 7 asks for.
+    function statusText(cause, detail, status) {
+        if (cause === "nothing-verified" && detail)
+            return I18n.trFor("noosphere", "no input could be verified (%1)").arg(cockpit.causeText(detail, status));
+        return cockpit.causeText(cause, status);
+    }
+
+    // The cause the service published, as a sentence. Every branch must be covered: an
+    // unhandled code would silently render the generic fallback and hide what went wrong.
+    function causeText(cause, status) {
+        switch (cause) {
+        case "nothing-verified":
+            return I18n.trFor("noosphere", "no input could be verified");
+        case "timeout":
+            return I18n.trFor("noosphere", "timed out");
+        case "offline":
+            return I18n.trFor("noosphere", "network unreachable");
+        case "token-refused":
+            return I18n.trFor("noosphere", "GitHub token refused");
+        case "rate-limited":
+            return I18n.trFor("noosphere", "GitHub API rate limit reached");
+        case "forbidden":
+            return I18n.trFor("noosphere", "access denied by GitHub");
+        case "not-found":
+            return I18n.trFor("noosphere", "repository not found");
+        case "unavailable":
+            return I18n.trFor("noosphere", "GitHub unavailable (%1)").arg(status);
+        case "unexpected":
+            return I18n.trFor("noosphere", "unexpected response from GitHub (%1)").arg(status);
+        case "metadata-unreadable":
+            return I18n.trFor("noosphere", "flake metadata unreadable");
+        case "flake-unreadable":
+            return I18n.trFor("noosphere", "flake unreadable (nix %1)").arg(status);
+        case "watchdog-timeout":
+            return I18n.trFor("noosphere", "check interrupted (timed out)");
+        case "out-of-queue":
+            return I18n.trFor("noosphere", "out-of-queue response");
+        default:
+            return I18n.trFor("noosphere", "check failed");
+        }
+    }
+
+    // A coarse clock to refresh the relative ages; they move slowly.
     property double now: Date.now() / 1000
     Timer {
         interval: 30000
@@ -41,9 +114,9 @@ PopoutComponent {
         onTriggered: cockpit.now = Date.now() / 1000
     }
 
-    // Enveloppe : le contenu du PopoutComponent est empilé dans une Column par DMS, qui
-    // interdit les anchors sur ses enfants directs. On place donc un seul Item (width +
-    // height, sans anchors) ; à l'intérieur, notre Column peut s'ancrer librement.
+    // Wrapper: DMS stacks a PopoutComponent's content in a Column, which forbids anchors on
+    // its direct children. So we place a single Item (width + height, no anchors); inside
+    // it, our own Column can anchor freely.
     Item {
         width: parent.width
         height: outer.implicitHeight + 28
@@ -58,7 +131,7 @@ PopoutComponent {
             anchors.topMargin: 14
             spacing: 11
 
-            // ============ Carte EN-TÊTE ============
+            // ============ Header card ============
             Rectangle {
                 width: parent.width
                 radius: 13
@@ -85,7 +158,7 @@ PopoutComponent {
                     anchors.bottomMargin: 14
                     spacing: 9
 
-                    // Ligne 1 : glyphe + identité, chip branche à droite.
+                    // Row 1: glyph + identity, branch chip on the right.
                     Item {
                         width: parent.width
                         height: 34
@@ -120,7 +193,7 @@ PopoutComponent {
                             }
                         }
 
-                        // Chip branche.
+                        // Branch chip.
                         Rectangle {
                             anchors.right: parent.right
                             anchors.verticalCenter: parent.verticalCenter
@@ -153,7 +226,7 @@ PopoutComponent {
                         }
                     }
 
-                    // Ligne 2 : génération à gauche, dernier check à droite.
+                    // Row 2: generation on the left, last check on the right.
                     Item {
                         width: parent.width
                         height: 16
@@ -172,7 +245,7 @@ PopoutComponent {
                             }
                             StyledText {
                                 anchors.verticalCenter: parent.verticalCenter
-                                text: cockpit.service && cockpit.service.generation > 0 ? ("génération n°" + cockpit.service.generation + " · activée " + Format.relativeAge(cockpit.service.generationActivatedAt, cockpit.now)) : "génération courante inconnue"
+                                text: cockpit.service && cockpit.service.generation > 0 ? I18n.trFor("noosphere", "generation #%1 · activated %2").arg(cockpit.service.generation).arg(cockpit.ageText(cockpit.service.generationActivatedAt)) : I18n.trFor("noosphere", "current generation unknown")
                                 font.pixelSize: Theme.fontSizeSmall
                                 color: "#a6adc8"
                             }
@@ -181,7 +254,7 @@ PopoutComponent {
                         StyledText {
                             anchors.right: parent.right
                             anchors.verticalCenter: parent.verticalCenter
-                            text: cockpit.service && cockpit.service.lastCheck > 0 ? ("check amont · " + Format.relativeAge(cockpit.service.lastCheck, cockpit.now)) : "check amont · en attente…"
+                            text: cockpit.service && cockpit.service.lastCheck > 0 ? I18n.trFor("noosphere", "upstream check · %1").arg(cockpit.ageText(cockpit.service.lastCheck)) : I18n.trFor("noosphere", "upstream check · pending…")
                             font.pixelSize: Theme.fontSizeSmall
                             color: "#6c7086"
                         }
@@ -189,7 +262,7 @@ PopoutComponent {
                 }
             }
 
-            // ============ Carte INPUTS ============
+            // ============ INPUTS card ============
             Rectangle {
                 width: parent.width
                 radius: 13
@@ -216,7 +289,7 @@ PopoutComponent {
                     anchors.bottomMargin: 14
                     spacing: 3
 
-                    // En-tête de carte.
+                    // Card header.
                     Item {
                         width: parent.width
                         height: 20
@@ -234,7 +307,7 @@ PopoutComponent {
                             }
                             StyledText {
                                 anchors.verticalCenter: parent.verticalCenter
-                                text: "INPUTS"
+                                text: I18n.trFor("noosphere", "INPUTS")
                                 font.family: Theme.defaultMonoFontFamily
                                 font.pixelSize: Theme.fontSizeSmall
                                 font.weight: Font.DemiBold
@@ -246,23 +319,23 @@ PopoutComponent {
                         StyledText {
                             anchors.right: parent.right
                             anchors.verticalCenter: parent.verticalCenter
-                            text: cockpit.service ? (cockpit.service.behindCount + " en retard · " + cockpit.service.upToDateCount + " à jour") : ""
+                            text: cockpit.service ? I18n.trFor("noosphere", "%1 behind · %2 up to date").arg(cockpit.service.behindCount).arg(cockpit.service.upToDateCount) : ""
                             font.family: Theme.defaultMonoFontFamily
                             font.pixelSize: Theme.fontSizeSmall
                             color: "#f9e2af"
                         }
                     }
 
-                    // Ligne de statut d'erreur (best-effort : la liste dessous reste le dernier connu).
+                    // Error status row; best-effort, the list below stays the last known state.
                     StyledText {
                         width: parent.width
                         visible: cockpit.isError
-                        text: "échec du check · réessayer"
+                        text: I18n.trFor("noosphere", "%1 · retry").arg(cockpit.service ? cockpit.statusText(cockpit.service.errorCause, cockpit.service.errorDetail, cockpit.service.errorStatus) : cockpit.causeText("", 0))
                         font.pixelSize: Theme.fontSizeSmall
                         color: "#f38ba8"
                     }
 
-                    // Liste des inputs directs.
+                    // The direct inputs.
                     Repeater {
                         model: cockpit.inputs
 
@@ -318,7 +391,7 @@ PopoutComponent {
                                     font.weight: Font.DemiBold
                                     color: "#cdd6f4"
                                 }
-                                // Chip de canal (ex. nixos-unstable), masqué si absent.
+                                // Channel chip (e.g. nixos-unstable), hidden when absent.
                                 Rectangle {
                                     visible: row.modelData.channel.length > 0
                                     Layout.alignment: Qt.AlignVCenter
@@ -336,17 +409,25 @@ PopoutComponent {
                                         color: "#6c7086"
                                     }
                                 }
-                                // Âge de lock élastique + élidable : absorbe le manque de place
-                                // (noms longs, gros compteurs) et pousse le retard à droite.
+                                // Elastic, elidable lock age: it absorbs the missing room — long
+                                // names, large counters — and pushes the lag to the right.
+                                //
+                                // `wrapMode: NoWrap` is load-bearing, not decoration: DMS's
+                                // StyledText defaults to WordWrap, and `elide` does nothing
+                                // while a text may wrap. Left to wrap, a lock age too wide for
+                                // its slot breaks onto a second line inside a row fixed at 30px
+                                // — which is what "lock il y a 31 j" does in French next to a
+                                // channel chip. Elide, as the sibling lag column already does.
                                 StyledText {
                                     Layout.fillWidth: true
+                                    wrapMode: Text.NoWrap
                                     elide: Text.ElideRight
-                                    text: "lock " + Format.relativeAge(row.modelData.lockedAt, cockpit.now)
+                                    text: I18n.trFor("noosphere", "lock %1").arg(cockpit.ageText(row.modelData.lockedAt))
                                     font.pixelSize: Theme.fontSizeSmall
                                     color: "#6c7086"
                                 }
 
-                                // Lien changelog (lecture seule) : révélé au survol d'une ligne en retard.
+                                // Changelog link (read-only), revealed on hover of a row that is behind.
                                 Rectangle {
                                     visible: row.behindPositive && row.changelogUrl.length > 0
                                     opacity: rowHover.hovered ? 1 : 0
@@ -367,7 +448,7 @@ PopoutComponent {
                                     StyledText {
                                         id: clText
                                         anchors.centerIn: parent
-                                        text: "changelog"
+                                        text: I18n.trFor("noosphere", "changelog")
                                         font.pixelSize: Theme.fontSizeSmall
                                         color: "#89b4fa"
                                     }
@@ -380,11 +461,11 @@ PopoutComponent {
                                     }
                                 }
 
-                                // Texte de retard, une seule ligne (largeur contenu), à droite.
+                                // Lag text, a single line sized to its content, on the right.
                                 StyledText {
                                     Layout.alignment: Qt.AlignVCenter
                                     wrapMode: Text.NoWrap
-                                    text: Format.behindLabel(row.modelData.behind)
+                                    text: cockpit.behindText(row.modelData.behind)
                                     font.family: Theme.defaultMonoFontFamily
                                     font.pixelSize: Theme.fontSizeSmall
                                     font.weight: Font.DemiBold
@@ -396,14 +477,14 @@ PopoutComponent {
                 }
             }
 
-            // ============ Carte DIFF DE CLOSURE ============
+            // ============ Closure diff card ============
             ClosureCard {
                 width: parent.width
                 service: cockpit.closureService
                 behindCount: cockpit.service ? cockpit.service.behindCount : 0
             }
 
-            // ============ Pied : cadence + check maintenant (lecture seule) ============
+            // ============ Footer: poll interval + manual re-check (read-only) ============
             Item {
                 width: parent.width
                 height: 36
@@ -423,7 +504,7 @@ PopoutComponent {
                         anchors.verticalCenter: parent.verticalCenter
                         text: {
                             var ms = cockpit.service ? cockpit.service.intervalMs : 3600000;
-                            return "cadence " + (ms >= 3600000 ? (Math.round(ms / 3600000) + " h") : (Math.round(ms / 60000) + " min"));
+                            return ms >= 3600000 ? I18n.trFor("noosphere", "every %1 h").arg(Math.round(ms / 3600000)) : I18n.trFor("noosphere", "every %1 min").arg(Math.round(ms / 60000));
                         }
                         font.family: Theme.defaultMonoFontFamily
                         font.pixelSize: Theme.fontSizeSmall
@@ -460,7 +541,7 @@ PopoutComponent {
                         }
                         StyledText {
                             anchors.verticalCenter: parent.verticalCenter
-                            text: "check maintenant"
+                            text: I18n.trFor("noosphere", "check now")
                             font.pixelSize: Theme.fontSizeSmall
                             font.weight: Font.DemiBold
                             color: "#1e1e2e"

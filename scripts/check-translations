@@ -1,0 +1,169 @@
+#!/usr/bin/env bash
+#
+# Check the translation tables against the strings `src/` actually renders.
+#
+# English is noosphere's source language and each English literal is its own translation id:
+# the code says `I18n.trFor("noosphere", "lock %1")`, and DMS looks that id up in the table
+# it auto-loads from `translations/<locale>.json`. Nothing registers the table, nothing
+# declares the ids — which means nothing notices when the two drift apart. A renamed string
+# silently falls back to English for every French user; a deleted one leaves an entry nobody
+# will ever read. This gate is what notices.
+#
+# It reports BOTH directions, because both are bugs, and it checks the placeholders too: a
+# translation that drops a `%1` renders a sentence with a hole in it, which no coverage count
+# would catch.
+#
+# jq and grep -P only: no DMS, no Quickshell, no network. Like check-manifest, this is a gate
+# CI *can* run.
+
+set -euo pipefail
+
+# Byte collation, for the whole script. `comm` needs its two inputs sorted the way IT
+# compares them, and it both compares and validates under the ambient locale — so sorting
+# the inputs with LC_ALL=C while comm runs under fr_FR makes it print "input is not in
+# sorted order" and skip entries. Setting it once, here, keeps every sort and every
+# comparison in the same order.
+export LC_ALL=C
+
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+src="$root/src"
+tables_dir="$root/translations"
+
+# The locales shipped as tables. English is the source and needs none: DMS's
+# `I18n.localeCandidates()` filters "en" out, so an en.json would never be read.
+LOCALES=(fr)
+
+fail=0
+report() {
+    echo "translations: $1" >&2
+    fail=1
+}
+
+# --- 1. Every trFor call must name this plugin, with a literal id -------------------------
+#
+# `trFor(pluginId, term)` looks the term up in the table registered under pluginId. A typo
+# there is invisible at runtime: the lookup misses, `trFor` falls back to DMS's own table,
+# misses again, and returns the English term — so the UI looks right in English and is
+# untranslatable in every other language.
+
+# Matched per OCCURRENCE, not per line. Five call sites in this repository put two trFor
+# calls on one line (a ternary with a branch each way); `grep -v` on whole lines would drop
+# the line as soon as ONE call on it were correct, and a typo sharing a line with a correct
+# neighbour would slip past the one check written to name it.
+wrong_plugin="$(grep -rnoP 'trFor\("[^"]*"' "$src" | grep -v 'trFor("noosphere"' || true)"
+if [ -n "$wrong_plugin" ]; then
+    while IFS= read -r line; do
+        [ -n "$line" ] || continue
+        report "trFor with a plugin id that is not the literal \"noosphere\": ${line#"$root/"}"
+    done <<<"$wrong_plugin"
+fi
+
+# An id built at runtime — `trFor("noosphere", someVar)` — cannot be collected, so it cannot
+# be covered. Counting the calls against the ones whose term is a literal is what catches it.
+calls="$(grep -rho 'trFor(' "$src" | wc -l)"
+literal_calls="$(grep -rhoP 'trFor\("noosphere",\s*"(?:[^"\\]|\\.)*"' "$src" | wc -l)"
+if [ "$calls" -ne "$literal_calls" ]; then
+    report "$calls trFor call(s) in src/, but only $literal_calls with a literal id — an id built at runtime cannot be translated"
+fi
+
+# --- 2. Collect the source ids ------------------------------------------------------------
+#
+# The literals are decoded through jq rather than unescaped by hand: `\"` appears in real
+# strings, and a QML escape jq rejects is a string we should hear about rather than guess at.
+
+ids_raw="$(grep -rhoP 'trFor\("noosphere",\s*"(?:[^"\\]|\\.)*"' "$src" | sed -E 's/^trFor\("noosphere",[[:space:]]*//')"
+if [ -z "$ids_raw" ]; then
+    echo "translations: no trFor(\"noosphere\", …) call found in src/ — the gate would pass on nothing" >&2
+    exit 1
+fi
+
+# All three created BEFORE the trap names them: under `set -u` a trap referring to a
+# variable an interrupted mktemp never assigned would itself error on the way out.
+ids_file="$(mktemp)"
+keys_file="$(mktemp)"
+vals_file="$(mktemp)"
+trap 'rm -f "$ids_file" "$keys_file" "$vals_file"' EXIT
+
+jq -r . <<<"$ids_raw" | sort -u >"$ids_file"
+echo "translations: $(wc -l <"$ids_file") source string(s) in src/"
+
+# --- 3. Each locale's table -------------------------------------------------------------
+#
+# Shape: { "<context>": { "<term>": "<translation>" } }. One bucket is enough — DMS's
+# `I18n._termIndex` flattens across contexts when a lookup passes no context, which ours
+# never do.
+
+for loc in "${LOCALES[@]}"; do
+    table="$tables_dir/$loc.json"
+    if [ ! -r "$table" ]; then
+        report "$loc: missing table ($table)"
+        continue
+    fi
+    jq -e . "$table" >/dev/null 2>&1 || {
+        report "$loc: not valid JSON"
+        continue
+    }
+    # Reject a flat table outright: DMS reads `table[context][term]`, so a flat
+    # { "term": "translation" } resolves only when term === context. It would load without
+    # error and translate nothing.
+    bad_shape="$(jq -r 'to_entries | map(select((.value | type) != "object")) | .[].key' "$table")"
+    if [ -n "$bad_shape" ]; then
+        while IFS= read -r ctx; do
+            [ -n "$ctx" ] || continue
+            report "$loc: context \"$ctx\" is not an object — the table must be { context: { term: translation } }"
+        done <<<"$bad_shape"
+        continue
+    fi
+
+    jq -r '[.[] | keys[]] | unique | .[]' "$table" | sort -u >"$keys_file"
+
+    missing="$(comm -23 "$ids_file" "$keys_file")"
+    orphan="$(comm -13 "$ids_file" "$keys_file")"
+
+    while IFS= read -r s; do
+        [ -n "$s" ] || continue
+        report "$loc: no entry for \"$s\""
+    done <<<"$missing"
+    while IFS= read -r s; do
+        [ -n "$s" ] || continue
+        report "$loc: entry \"$s\" matches no string in src/"
+    done <<<"$orphan"
+
+    # Every value must be a non-empty STRING.
+    #
+    # Empty is worse than missing: `_lookup` treats "" as a miss and falls through to
+    # English, so the table claims coverage it does not give. A non-string is worse still.
+    # `_termIndex` indexes any TRUTHY value, so `"retry": 42` makes trFor return a number:
+    # a plain label then renders "42", and a placeholder id blows up, because the call site
+    # does `.arg(…)` on it and a number has no `.arg` — the binding throws and the slot goes
+    # blank. Checking only for "" let all of 42 / {} / [] through green.
+    bad_value="$(jq -r '.[] | to_entries[] | select((.value | type) != "string" or .value == "") | "\(.key)\t\(.value | type)"' "$table")"
+    while IFS=$'\t' read -r s kind; do
+        [ -n "$s" ] || continue
+        if [ "$kind" = "string" ]; then
+            report "$loc: entry \"$s\" is empty"
+        else
+            report "$loc: entry \"$s\" is a $kind, not a string"
+        fi
+    done <<<"$bad_value"
+
+    # Placeholders. `.arg()` fills %1, %2 … in order; a translation that drops one renders a
+    # sentence with a hole, and one that invents one renders a literal "%2".
+    jq -r '.[] | to_entries[] | "\(.key)\t\(.value)"' "$table" >"$vals_file"
+    while IFS=$'\t' read -r key val; do
+        [ -n "$key" ] || continue
+        grep -qxF -- "$key" "$ids_file" || continue # already reported as an orphan
+        # `|| true`: a string with no placeholder makes grep exit 1, which under `set -e`
+        # would abort the whole gate from inside a command substitution — silently, with a
+        # non-zero exit and not one finding printed.
+        want="$(grep -oE '%[0-9]' <<<"$key" | sort -u | tr '\n' ' ' || true)"
+        got="$(grep -oE '%[0-9]' <<<"$val" | sort -u | tr '\n' ' ' || true)"
+        [ "$want" = "$got" ] || report "$loc: \"$key\" has placeholders [${want% }] but its translation has [${got% }]"
+    done <"$vals_file"
+done
+
+if [ "$fail" -ne 0 ]; then
+    echo "translations: FAILED" >&2
+    exit 1
+fi
+echo "translations: ${#LOCALES[@]} locale(s) cover every source string, placeholders included"

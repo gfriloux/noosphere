@@ -1,6 +1,10 @@
-// Réglages du plugin (PluginSettings de DMS). Déclaratif : chaque *Setting auto-persiste
-// dans pluginData via son settingKey. Le widget (NoosphereWidget) lit flakePath / repoSlug /
-// branch / githubToken / apiBase / checkMinutes et les injecte dans le service Noosphere.
+// The plugin's settings (DMS's PluginSettings). Declarative: each *Setting auto-persists
+// into pluginData through its settingKey. The widget (NoosphereWidget) reads flakePath /
+// repoSlug / branch / githubToken / apiBase / checkMinutes and injects them into the
+// Noosphere service.
+//
+// Every label, description and placeholder is English and wrapped for translation, like the
+// cockpit's own copy: the settings panel is as user-facing as the popout.
 import QtQuick
 import qs.Common
 import qs.Widgets
@@ -12,7 +16,7 @@ PluginSettings {
 
     StyledText {
         width: parent.width
-        text: "Réglages Noosphere"
+        text: I18n.trFor("noosphere", "Noosphere settings")
         font.pixelSize: Theme.fontSizeLarge
         font.weight: Font.Bold
         color: Theme.surfaceText
@@ -20,59 +24,59 @@ PluginSettings {
 
     StringSetting {
         settingKey: "flakePath"
-        label: "Chemin du flake"
-        description: "Chemin local du flake NixOS à suivre (contenant flake.nix / flake.lock). Ex. « /etc/nixos » ou « /home/kuri/nixos »."
+        label: I18n.trFor("noosphere", "Flake path")
+        description: I18n.trFor("noosphere", "Local path of the NixOS flake to follow (the directory holding flake.nix / flake.lock). E.g. \"/etc/nixos\" or \"~/nixos\".")
         placeholder: "/etc/nixos"
         defaultValue: ""
     }
 
     StringSetting {
         settingKey: "hostname"
-        label: "Hostname (diff de closure)"
-        description: "Clé de nixosConfigurations à builder pour l'aperçu de closure (carte DIFF DE CLOSURE). Laisser vide pour résoudre l'hôte courant via `hostname`."
-        placeholder: "(hôte courant)"
+        label: I18n.trFor("noosphere", "Hostname (closure diff)")
+        description: I18n.trFor("noosphere", "The nixosConfigurations key to build for the closure preview (the CLOSURE DIFF card). Leave empty to resolve the current host through `hostname`.")
+        placeholder: I18n.trFor("noosphere", "(current host)")
         defaultValue: ""
     }
 
     StringSetting {
         settingKey: "repoSlug"
-        label: "Dépôt (affichage)"
-        description: "Identité du flake affichée dans l'en-tête du cockpit. Ex. « gfriloux/nixos »."
+        label: I18n.trFor("noosphere", "Repository (display)")
+        description: I18n.trFor("noosphere", "The flake's identity, shown in the cockpit's header. E.g. \"gfriloux/nixos\".")
         placeholder: "owner/repo"
         defaultValue: ""
     }
 
     StringSetting {
         settingKey: "branch"
-        label: "Branche du flake"
-        description: "Branche du dépôt du flake, affichée dans l'en-tête. Purement cosmétique (le retard des inputs se mesure sur leurs propres branches amont)."
+        label: I18n.trFor("noosphere", "Flake branch")
+        description: I18n.trFor("noosphere", "The branch of the flake's own repository, shown in the header. Purely cosmetic (how far behind an input is gets measured against its own upstream branch).")
         placeholder: "main"
         defaultValue: "main"
     }
 
     StringSetting {
         settingKey: "githubToken"
-        label: "Token GitHub (optionnel)"
-        description: "Token à portée publique (Fine-grained : lecture seule ; ou classic sans scope). Lève la limite de 60 requêtes/h de l'API compare. Stocké en clair dans la config du plugin ; envoyé en header Authorization: Bearer. Laisser vide pour l'API anonyme."
+        label: I18n.trFor("noosphere", "GitHub token (optional)")
+        description: I18n.trFor("noosphere", "A public-scope token (fine-grained: read-only; or classic with no scope). Lifts the compare API's 60 requests/h limit. Stored in cleartext in the plugin's config; sent as an Authorization: Bearer header. Leave empty for the anonymous API.")
         placeholder: "github_pat_…"
         defaultValue: ""
     }
 
     SliderSetting {
         settingKey: "checkMinutes"
-        label: "Cadence de check"
-        description: "Fréquence d'interrogation de l'amont GitHub (minutes). Lecture seule, aucune écriture."
+        label: I18n.trFor("noosphere", "Check interval")
+        description: I18n.trFor("noosphere", "How often GitHub upstream is polled (minutes). Read-only, never a write.")
         defaultValue: 60
         minimum: 5
         maximum: 720
-        unit: "min"
+        unit: I18n.trFor("noosphere", "min")
         leftIcon: "schedule"
     }
 
     StringSetting {
         settingKey: "apiBase"
-        label: "Base de l'API GitHub (dev)"
-        description: "Surcharge l'endpoint de l'API GitHub (défaut https://api.github.com). Sert au mock local en développement (just mock → http://127.0.0.1:8385). Laisser vide en usage normal."
+        label: I18n.trFor("noosphere", "GitHub API base (dev)")
+        description: I18n.trFor("noosphere", "Overrides the GitHub API endpoint (default https://api.github.com). For the local mock during development (just mock → http://127.0.0.1:8385). Leave empty in normal use.")
         placeholder: "https://api.github.com"
         defaultValue: ""
     }

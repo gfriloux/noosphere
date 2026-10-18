@@ -7,7 +7,7 @@ import "../src/model/closure.js" as Closure
 TestCase {
     name: "model"
 
-    // ---- closure : sévérité (le parse complet est golden-testé) ----
+    // ---- closure: severity (the full parse is golden-tested) ----
 
     function test_closureSeverity_reboot() {
         compare(Closure.closureSeverity("linux"), "reboot");
@@ -59,9 +59,9 @@ TestCase {
         compare(Model.parseCompare(null), null);
     }
 
-    // Une réponse compare n'est exploitable que si elle porte bien sur la révision
-    // verrouillée de l'input attendu : sinon elle vient d'une requête d'un autre input
-    // (réponse tardive, étape sautée) et l'enregistrer attribuerait son retard au voisin.
+    // A compare response is only usable if it really is about the expected input's locked
+    // revision: otherwise it answers another input's request (a late response, a skipped
+    // step), and recording it would credit that input's lag to its neighbour.
     function test_compareBelongsTo_match() {
         compare(Model.compareBelongsTo({
             "base_commit": {
@@ -117,10 +117,12 @@ TestCase {
         }, "", "stc"), false);
     }
 
-    // ---- githubError : statut HTTP → cause nommée ----
+    // ---- githubError: HTTP status → a named cause ----
     //
-    // `fatal` dit si la cause vaut pour toutes les requêtes suivantes (inutile de marteler
-    // l'API : le poll s'arrête) ou si elle ne concerne que cet input (on avance).
+    // It returns a `code`, never a sentence: the view turns the code into words, so the
+    // wording can be translated and this layer stays pure. `fatal` says whether the cause
+    // holds for every later request — no point hammering the API, the poll stops — or
+    // concerns only this input, in which case the poll advances.
 
     function test_githubError_ok() {
         compare(Model.githubError(200, "{}", false), null);
@@ -128,45 +130,57 @@ TestCase {
     }
     function test_githubError_rateLimit() {
         var e = Model.githubError(403, '{"message": "API rate limit exceeded for 1.2.3.4."}', false);
+        compare(e.code, "rate-limited");
         compare(e.fatal, true);
-        verify(e.message.indexOf("limite") >= 0);
-        // 429 : limite secondaire, même conduite quel que soit le corps.
+        // 429: the secondary limit, same conduct whatever the body says.
+        compare(Model.githubError(429, "{}", false).code, "rate-limited");
         compare(Model.githubError(429, "{}", false).fatal, true);
     }
-    function test_githubError_forbiddenSansLimite() {
-        // Un 403 qui n'est pas une limite de débit ne doit pas être annoncé comme telle.
+    function test_githubError_forbiddenWithoutRateLimit() {
+        // A 403 that is not a rate limit must not be reported as one.
         var e = Model.githubError(403, '{"message": "Resource not accessible"}', false);
+        compare(e.code, "forbidden");
         compare(e.fatal, true);
-        compare(e.message.indexOf("limite"), -1);
     }
     function test_githubError_token() {
         var e = Model.githubError(401, '{"message": "Bad credentials"}', false);
+        compare(e.code, "token-refused");
         compare(e.fatal, true);
-        verify(e.message.indexOf("token") >= 0);
     }
     function test_githubError_notFound() {
-        // Propre à un input : les autres restent comparables.
+        // Specific to one input: the others stay comparable.
         var e = Model.githubError(404, '{"message": "Not Found"}', false);
+        compare(e.code, "not-found");
         compare(e.fatal, false);
     }
-    function test_githubError_serveur() {
-        compare(Model.githubError(500, "", false).fatal, false);
-        compare(Model.githubError(503, "", false).fatal, false);
+    function test_githubError_server() {
+        // The status travels with the code so the view can render "(503)".
+        var e = Model.githubError(503, "", false);
+        compare(e.code, "unavailable");
+        compare(e.fatal, false);
+        compare(e.status, 503);
+        compare(Model.githubError(500, "", false).code, "unavailable");
+    }
+    function test_githubError_unexpectedStatus() {
+        var e = Model.githubError(418, "", false);
+        compare(e.code, "unexpected");
+        compare(e.fatal, false);
+        compare(e.status, 418);
     }
     function test_githubError_transport() {
-        // status 0 couvre deux causes distinctes, que seul le drapeau sépare.
+        // status 0 covers two distinct causes, which only the flag separates.
         var timeout = Model.githubError(0, "", true);
-        var reseau = Model.githubError(0, "", false);
+        var offline = Model.githubError(0, "", false);
+        compare(timeout.code, "timeout");
+        compare(offline.code, "offline");
         compare(timeout.fatal, false);
-        compare(reseau.fatal, false);
-        verify(timeout.message !== reseau.message);
-        verify(timeout.message.indexOf("délai") >= 0);
+        compare(offline.fatal, false);
     }
-    function test_githubError_corpsIllisible() {
-        // Un corps non-JSON ne doit pas faire échouer la traduction.
+    function test_githubError_unreadableBody() {
+        // A non-JSON body must not break the classification.
         var e = Model.githubError(403, "<html>gateway</html>", false);
+        compare(e.code, "forbidden");
         compare(e.fatal, true);
-        verify(e.message.length > 0);
     }
 
     function test_upstreamRef() {
@@ -235,21 +249,26 @@ TestCase {
         compare(Format.stateColor("boom"), "#6c7086");
     }
 
-    function test_behindLabel() {
-        compare(Format.behindLabel(null), "—");
-        compare(Format.behindLabel(0), "à jour");
-        compare(Format.behindLabel(1), "1 commit en retard");
-        compare(Format.behindLabel(214), "214 commits en retard");
-    }
-
     function test_compareWebUrl() {
         compare(Format.compareWebUrl("gfriloux", "nixos", "abc", "main"), "https://github.com/gfriloux/nixos/compare/abc...main");
     }
 
-    function test_relativeAge() {
-        compare(Format.relativeAge(1000, 1030), "à l'instant");
-        compare(Format.relativeAge(1000, 1000 + 5 * 60), "il y a 5 min");
-        compare(Format.relativeAge(1000, 1000 + 3 * 3600), "il y a 3 h");
-        compare(Format.relativeAge(1000, 1000 + 9 * 86400), "il y a 9 j");
+    // Parts, not prose: the view turns { unit, value } into a translated sentence.
+    function test_relativeAgeParts() {
+        compare(Format.relativeAgeParts(1000, 1030).unit, "now");
+        var m = Format.relativeAgeParts(1000, 1000 + 5 * 60);
+        compare(m.unit, "minutes");
+        compare(m.value, 5);
+        var h = Format.relativeAgeParts(1000, 1000 + 3 * 3600);
+        compare(h.unit, "hours");
+        compare(h.value, 3);
+        var d = Format.relativeAgeParts(1000, 1000 + 9 * 86400);
+        compare(d.unit, "days");
+        compare(d.value, 9);
+    }
+
+    // A timestamp in the future must not produce a negative age.
+    function test_relativeAgeParts_future() {
+        compare(Format.relativeAgeParts(2000, 1000).unit, "now");
     }
 }

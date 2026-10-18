@@ -83,7 +83,7 @@ holds the application state: `inputs`, `behindCount`, `barState` (`uptodate | dr
 `connectionStatus`, `lastCheck`. **Pure and testable**: same inputs → same model (see the
 golden tests, PROCEDURE_PLANS.md).
 
-The **presentation** helpers (relative time « il y a 9 j », state colour, the web
+The **presentation** helpers (the parts of a relative age, state colour, the web
 compare URL for the changelog link) live in `format.js`, **outside the golden model**
 (derivable / dependent on *now*).
 
@@ -110,7 +110,7 @@ Mocha) and Material 3 components.
   tested by goldens + inline (`tests/`, `just test` / `just bless`).
 - `view` → `src/view/`: the `Noosphere` (drift poll) and `Closure` (on-demand build+diff)
   services; `NoosphereWidget` (bar + badge), `NoosphereGlyph` (glyph), `Cockpit` (popout:
-  header + INPUTS + DIFF DE CLOSURE cards), `ClosureCard` (diff card), `Settings` (config).
+  header + INPUTS + CLOSURE DIFF cards), `ClosureCard` (diff card), `Settings` (config).
   Theme = DMS.
 
 #### HTTP transport stays inside the process
@@ -181,6 +181,22 @@ in-flight request at a time is reasoned about effortlessly.
    confident number would be the display contradicting itself (invariant 11). A flake with no
    comparable input at all is **not** this case: there was nothing to verify, which is not a
    failure to verify.
+
+   **The cause is named, and shown.** The service publishes a cause *code* (`errorCause`,
+   plus `errorStatus` where the cause carries a number), never a sentence: the `model` layer
+   stays pure and the wording lives in the view, which is what makes it translatable. The
+   cockpit's status row renders that cause rather than a fixed "the check failed" — up to
+   v0.4.0 the cause was computed and then discarded, so a user saw that something broke but
+   never what.
+
+   **"Nothing was verified" is a verdict, not a cause,** and the two are shown together. Most
+   GitHub failures are *non-fatal*: they make one input indeterminate and the poll moves on.
+   When every input fails that way — the commonest case of all being a machine with no
+   network — the poll still commits, and the verdict alone would once again say that
+   something broke without saying what. So the driver carries the last non-fatal cause
+   (`errorDetail`) to the commit, and the row reads
+   « no input could be verified (network unreachable) », both halves. A poll that verified
+   something publishes no detail.
 8. **Determinism of the data layer.** `query` + `model` are deterministic for a frozen set
    of inputs (`nix flake metadata` output + compare responses + `nvd diff` output) — that is
    what makes the golden tests possible. `behind`/`behindCount`/`barState` and
@@ -204,7 +220,7 @@ in-flight request at a time is reasoned about effortlessly.
     back: without it, a manual re-check would stay without effect.
 11. **The display never contradicts itself.** Two cards describing the same state cannot
     state it differently. An input that is behind but not previewable (upstream unresolved) is
-    **named as such** by the closure card; « aucun input en retard » is reserved
+    **named as such** by the closure card; « no input behind » is reserved
     for the case where there really is none. A corollary of invariant 7: degrading the
     display is allowed, lying is not.
 
@@ -220,22 +236,20 @@ the design handoff (`tmp/design_handoff_noosphere/Noosphere.dc.html`, not commit
 > freedom: the **font** — the shell's system font for text, the shell's mono (JetBrains Mono
 > / Fira Code) for everything marked mono.
 
-> **On the French strings this document quotes.** The UI copy is French **today**. Every
-> French literal in guillemets — in this section and in §2 `model` above — is a string `src/`
-> renders now, shown with `<placeholders>` and with `N`/`M`/`A`/`R` standing where the code
-> interpolates: the code holds `"lock "`, `" commits en retard"`, `"· Δ "` and so on, not the
-> whole phrase. They are quoted, not translated, so this document keeps describing the
-> interface that actually exists.
+> **On the UI strings this document quotes.** A literal in guillemets — « … », here and in
+> §2 `model` above — is a notation, not a quotation: it marks a string `src/` actually
+> renders, with `<placeholders>` and with `N`/`M`/`A`/`R` standing where the code
+> interpolates. The code holds one whole id per sentence — `"lock %1"`,
+> `"%1 commits behind"` — never the fragments; `.arg()` fills the placeholders.
 >
-> **One exception, below:** the Adeptus Mechanicus section's « dérive », « amont », « verrou »
-> are named as the project's **vocabulary**, not as rendered copy. Of the three only « amont »
-> reaches the screen; the other two live in code comments, which are themselves bound for
-> English. The rule, stated once: a French string stays French here when it is a **rendered**
-> UI literal — a word appearing only in a comment is not one.
+> **English is the source.** Every id is its own English string, and every one of them is
+> wrapped in `I18n.trFor("noosphere", …)`, so DMS can substitute a translation loaded from
+> `translations/<locale>.json`. French ships in `translations/fr.json`; English needs no
+> file. A screen whose wording is not in that table is a bug, not a style.
 >
-> English is noosphere's default language and the UI will follow, with EN/FR
-> internationalisation, under its own plan — see `PROCEDURE_PLANS.md`. Until then, a French
-> literal here is deliberate, not a missed translation.
+> **One exception, below:** the Adeptus Mechanicus section's « dérive », « amont »,
+> « verrou » are named as the project's **vocabulary** — the terms the project reasons in —
+> not as rendered copy. None of the three reaches an English screen.
 
 ### Palette — Catppuccin Mocha
 
@@ -268,8 +282,8 @@ noosphere's visual pillar. The **bar badge**'s colour encodes the drift state:
 | `rebuilding` *(future cap, not reached in v1)* | Mauve `#cba6f7` | hidden | rebuild in progress |
 
 In the INPUTS card, each row carries a **state dot**: yellow `#f9e2af` if behind, green
-`#a6e3a1` if up to date. The behind label is yellow (« N commits en retard ») or grey
-`#6c7086` (« à jour »).
+`#a6e3a1` if up to date. The behind label is yellow (« N commits behind ») or grey
+`#6c7086` (« up to date »).
 
 ### Shapes & depth
 
@@ -299,28 +313,28 @@ A small drift cockpit. Reference layout (the HTML prototype details the pixel-pe
 - **Header card** (`#89b4fa` edge): 22px glyph + « noosphere » (16px/700
   `#cdd6f4`) and `owner/repo` (mono 12px `#89b4fa`); on the right, a branch chip
   (`fork_right` icon + name, `#1e1e2e` background, `#45475a` border). Row 2: green dot +
-  generation (« n°N · activée il y a … »); on the right « check amont · il y a
+  generation (« generation #N · activated … »); on the right « upstream check ·
   … » `#6c7086`.
 - **INPUTS card** (`#f9e2af` edge, the heart of the widget): header « INPUTS » +
-  « N en retard · M à jour » on the right. One row per input: state dot · name
+  « N behind · M up to date » on the right. One row per input: state dot · name
   (mono 13px/600) · optional channel chip (mono 10.5px `#6c7086`) ·
   « lock <age> »; on the right, the behind label (mono 11px/600, min-width 104,
   right-aligned). **Hover** on a row that is behind: background `rgba(255,255,255,.045)` +
   a 120ms reveal of the **changelog** link (`#89b4fa`, opens GitHub's web compare) —
   **read-only**.
 
-- **DIFF DE CLOSURE card** (peach `#fab387` edge if a `reboot` change, otherwise neutral
+- **CLOSURE DIFF card** (peach `#fab387` edge if a `reboot` change, otherwise neutral
   `#45475a`; red `#f38ba8` on error) — **update preview**: `nvd diff` between
   `/run/current-system` and a toplevel **built on demand, with the inputs that are behind
   pointed at upstream** (`--override-input`, without writing the lock). Title:
-  `deployed_code` icon + « DIFF DE CLOSURE ».
-  - **idle**: a « prévisualiser la mise à jour (N) » button (`#89b4fa`) if N inputs
-    are behind; otherwise the note « aucun input en retard ». The card is empty
+  `deployed_code` icon + « CLOSURE DIFF ».
+  - **idle**: a « preview the update (N) » button (`#89b4fa`) if N inputs
+    are behind; otherwise the note « no input behind — nothing to preview ». The card is empty
     until a build has run (never automatic).
   - **building / diffing**: mauve `#cba6f7` spinner + the step's label.
   - **ready**: a summary row (mono 12px, segments separated by `·` `#6c7086`)
-    « N màj » `#f9e2af` · « A ajoutés » `#a6e3a1` ·
-    « R retirés » `#f38ba8` · « Δ <size> » `#fab387`; then a `#181825`
+    « N updated » `#f9e2af` · « A added » `#a6e3a1` ·
+    « R removed » `#f38ba8` · « Δ <size> » `#fab387`; then a `#181825`
     console block (radius 9, mono 12px): per entry `name  <from>  →  <to>` (versions
     `#6c7086`, the new one `#cdd6f4`). A `reboot` entry: peach `#fab387` name, ▲ marker, a
     right-hand **REBOOT** badge (mono 9.5px, `#fab387` on `rgba(250,179,135,.14)`).
@@ -334,12 +348,12 @@ A small drift cockpit. Reference layout (the HTML prototype details the pixel-pe
 
 ### Secondary states
 
-- **Up to date (zen)**: blue badge, pill hidden; INPUTS card « 0 en retard · M à
-  jour », every dot green.
+- **Up to date (zen)**: blue badge, pill hidden; INPUTS card « 0 behind · M up to
+  date », every dot green.
 - **Loading (check in progress)**: the behind columns in grey `#6c7086` placeholder, the list
   **not emptied** (we keep the last known state).
 - **Error** (flake not found, GitHub unreachable/rate-limited): the INPUTS card's edge in red
-  `#f38ba8`, a status row « échec du check · réessayer », the bar badge in grey
+  `#f38ba8`, a status row « <cause> · retry » naming the cause, the bar badge in grey
   `#6c7086` keeping its last known value.
 
 ---
@@ -350,5 +364,6 @@ Subtle, never kitsch. The **noosphere** is the Mechanicus's information network;
 glyph is a **rosette/gear** (an 8-spoke wheel + hub), a discreet echo of the mechanical cog.
 Sober vocabulary: the project says « dérive », « amont », « verrou », not their flashier
 synonyms. These are the French terms the project reasons in — *drift*, *upstream*, *lock* —
-and they are named here as terms, not prescribed as English copy. It is a seasoning, not a
-theme.
+and they are named here as terms, not as copy: the UI renders **English**, with French
+available through `translations/fr.json`, and on screen those three read *drift*,
+*upstream* and *lock*. It is a seasoning, not a theme.

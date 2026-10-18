@@ -1,9 +1,9 @@
-# Module home-manager : installe noosphere comme plugin DankMaterialShell.
+# home-manager module: installs noosphere as a DankMaterialShell plugin.
 #
-# Assemble le plugin (plugin.json + src/) dans le store et le lie dans le dossier de
-# plugins de DMS. L'activation se fait ensuite dans DMS (Settings → Plugins → Noosphere),
-# puis les réglages (chemin du flake, owner/repo, branche, token GitHub optionnel,
-# intervalle) dans ce panneau.
+# Assembles the plugin (plugin.json + src/ + translations/) in the store and links it into
+# DMS's plugin directory. Activation then happens in DMS (Settings → Plugins → Noosphere),
+# followed by the settings (flake path, owner/repo, branch, optional GitHub token, interval)
+# in that same panel.
 {
   config,
   lib,
@@ -12,23 +12,27 @@
 }: let
   cfg = config.programs.noosphere;
 
+  # translations/ must travel with the plugin: DMS loads the French table from
+  # <pluginDir>/translations/<locale>.json by itself, and a plugin directory without it is
+  # simply English everywhere, with nothing on screen or in a log saying why.
   plugin = pkgs.runCommandLocal "noosphere-plugin" {} ''
     mkdir -p $out
     cp ${../plugin.json} $out/plugin.json
     cp -r ${../src} $out/src
+    cp -r ${../translations} $out/translations
   '';
 in {
   options.programs.noosphere.enable =
-    lib.mkEnableOption "noosphere — widget de suivi de dérive de flake pour DankMaterialShell";
+    lib.mkEnableOption "noosphere — a flake drift tracker widget for DankMaterialShell";
 
   config = lib.mkIf cfg.enable {
-    # Le plugin est découvert par DMS dans ~/.config/DankMaterialShell/plugins/.
+    # DMS discovers the plugin in ~/.config/DankMaterialShell/plugins/.
     xdg.configFile."DankMaterialShell/plugins/Noosphere".source = plugin;
 
-    # Deps runtime : nix (lit le flake local via `nix flake metadata` et build le toplevel
-    # à la demande), nvd (diff de closure) et xdg-open (liens changelog, fourni par
-    # xdg-utils). L'amont GitHub est interrogé par le service lui-même : aucun client HTTP
-    # externe n'est requis.
+    # Runtime deps: nix (reads the local flake through `nix flake metadata` and builds the
+    # toplevel on demand), nvd (the closure diff) and xdg-open (changelog links, provided by
+    # xdg-utils). GitHub upstream is queried by the service itself: no external HTTP client
+    # is required.
     home.packages = [pkgs.nix pkgs.nvd pkgs.xdg-utils];
   };
 }

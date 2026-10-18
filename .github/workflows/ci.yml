@@ -1,14 +1,14 @@
 name: CI
 
-# Portes de qualité sur push et PR. Appelle `just ci` (fmt-check + lint + test) dans le
-# dev shell Nix — même définition que pre-commit et le dev local (le Justfile fait foi).
+# Quality gates on push and PR. Calls `just ci-hermetic` inside the Nix dev shell — the same
+# definition pre-commit and local development use; the Justfile is the authority.
 
 on:
   push:
     branches: ["**"]
   pull_request:
 
-# Un seul run par ref : les push successifs annulent les runs obsolètes.
+# One run per ref: a later push cancels the runs it supersedes.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -35,5 +35,5 @@ jobs:
                "installed — see PROCEDURE_PLANS.md section 4. A green run here proves"\
                "fmt-check, the manifest check and the tests, and nothing about QML."
 
-      - name: just ci-hermetic (fmt-check + check-manifest + test)
+      - name: just ci-hermetic (fmt-check + check-manifest + check-translations + test)
         run: nix develop --command just ci-hermetic

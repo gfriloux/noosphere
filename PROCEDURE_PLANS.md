@@ -99,12 +99,13 @@ document **redefines** the gates — a list elsewhere (here, `CLAUDE.md`, `READM
 convenience copy of the `Justfile`, never a second source.
 
 ```bash
-just fmt-check       # qmlformat — no unformatted file
-just check-manifest  # plugin.json against DMS's published schema (vendored)
-just test            # goldens (frozen inputs → model) + Qt Quick Test
-just lint            # qmllint — blocks at zero; needs DMS installed
-just ci              # all four
-just ci-hermetic     # all but lint: the subset CI can run (no DMS on a runner)
+just fmt-check          # qmlformat — no unformatted file
+just check-manifest     # plugin.json against DMS's published schema (vendored)
+just check-translations # translations/ against src/'s wrapped strings, both directions
+just test               # goldens (frozen inputs → model) + Qt Quick Test
+just lint               # qmllint — blocks at zero; needs DMS installed
+just ci                 # all five
+just ci-hermetic        # all but lint: the subset CI can run (no DMS on a runner)
 ```
 
 > **`lint` needs DankMaterialShell installed, and blocks at zero.** `qmllint` cannot resolve
@@ -189,14 +190,23 @@ port, 8385 by default, so likewise **one mock at a time** unless the port is ove
 - **Nix.** Always `nix develop`, or `nix develop --command …` for non-interactive commands.
 - **Language.**
 
-  > English is noosphere's default language — documents, code comments, commit messages, and
-  > the software's own copy. The UI is French today and stays French until the English/i18n
-  > plan lands; French then becomes one locale of two, if EN/FR internationalisation proves
-  > workable in a hot-loaded DMS plugin.
+  > English is noosphere's default language — documents, code comments, commit messages,
+  > and the UI itself. Since v0.5.0 French is **one locale of two**, carried by
+  > `translations/fr.json` and loaded by DMS with no registration code on our side.
 
   Consequences:
-  - A French UI string is **quoted** when a document describes it, never silently translated
-    as a side effect of another change. `DESIGN.md`'s visual system says so on the spot.
+  - **New UI copy is written in English and wrapped** in
+    `I18n.trFor("noosphere", "<English>")`, with its French entry in the same commit.
+    `just check-translations` enforces the pairing in both directions — a string with no
+    entry, and an entry no string renders.
+  - What the gate **cannot** see is the language of an id. An unwrapped French literal
+    passes every check and can never be translated away, so it is the one thing to watch for
+    by eye in review.
+  - A sentence assembled by concatenation becomes **one id with `%1` placeholders**, filled
+    by `.arg()`. Fragments cannot be reordered, and French frequently needs that.
+  - When a document quotes a UI string, it quotes the **English source** — `DESIGN.md`'s
+    visual system says so on the spot, and defines « … » as notation for "a string `src/`
+    renders", not as a quotation of French.
   - The rule **binds GitHub Issues** too, now that Issues is the only backlog and therefore
     part of the project's written record: titles, bodies, comments, PR descriptions in
     English. One carve-out: a **measurement carried from elsewhere is reproduced as a

@@ -9,20 +9,20 @@ ci: ci-hermetic lint
 # CI runs, because a GitHub runner has no DMS and therefore cannot resolve the QML imports
 # (see scripts/qml-import-paths). Naming it here keeps the Justfile the single definition of
 # both gates, with the difference between them explicit instead of duplicated in ci.yml.
-ci-hermetic: fmt-check check-manifest test
+ci-hermetic: fmt-check check-manifest check-translations test
 
-# Formate le QML en place (qmlformat).
+# Format the QML in place (qmlformat).
 fmt:
     @find src -name '*.qml' -print0 2>/dev/null | xargs -0 -r qmlformat -i
 
-# Vérifie le format sans modifier : échoue si un fichier n'est pas formaté.
+# Check formatting without modifying: fails when a file is not formatted.
 fmt-check:
     #!/usr/bin/env bash
     set -euo pipefail
     fail=0
     while IFS= read -r -d '' f; do
         if ! diff -q "$f" <(qmlformat "$f") >/dev/null; then
-            echo "non formaté : $f"; fail=1
+            echo "not formatted: $f"; fail=1
         fi
     done < <(find src -name '*.qml' -print0 2>/dev/null)
     exit $fail
@@ -86,31 +86,38 @@ lint:
 check-manifest:
     @scripts/check-manifest
 
-# Tests golden : qmltestrunner exécute les transforms JS sur fixtures → compare aux goldens.
+# Check the translation tables against the strings src/ renders. Both directions: a string
+# with no entry, and an entry no string uses. Hermetic like check-manifest — jq and grep
+# only, no DMS.
+check-translations:
+    @scripts/check-translations
+
+# Golden tests: qmltestrunner runs the JS transforms on the fixtures and compares against
+# the goldens.
 test:
     #!/usr/bin/env bash
     set -euo pipefail
     if ! find tests -name 'tst_*.qml' 2>/dev/null | grep -q .; then
-        echo "aucun test (tests/tst_*.qml absent)"; exit 0
+        echo "no test (tests/tst_*.qml missing)"; exit 0
     fi
-    # QtTest (TestCase) importe QtQuick.Window : on pointe explicitement le dossier qml de
-    # qtdeclarative (sinon, en CI sans QML2_IMPORT_PATH ambiant, le module est introuvable).
+    # QtTest's TestCase imports QtQuick.Window, so point explicitly at qtdeclarative's qml
+    # directory — without it, CI has no ambient QML2_IMPORT_PATH and the module is missing.
     qmldir="$(dirname "$(dirname "$(command -v qmltestrunner)")")/lib/qt-6/qml"
     export QML2_IMPORT_PATH="$qmldir${QML2_IMPORT_PATH:+:$QML2_IMPORT_PATH}"
     QT_QPA_PLATFORM=offscreen QML_XHR_ALLOW_FILE_READ=1 qmltestrunner -input tests
 
-# Régénère les goldens depuis les fixtures (transform courant). Relire le diff ensuite.
+# Regenerate the goldens from the fixtures with the current transforms. Read the diff after.
 bless:
     QML_XHR_ALLOW_FILE_READ=1 quickshell -p bless.qml
 
-# Serveur mock du compare GitHub pour le dev (aucun réseau requis). scenario :
-# drift | uptodate | ratelimit | error. Régler l'endpoint GitHub du plugin sur
+# Mock server for the GitHub compare API, for development (no network needed). scenario:
+# drift | uptodate | ratelimit | error. Point the plugin's GitHub endpoint at
 # http://127.0.0.1:<port>.
 mock scenario="drift" port="8385":
     @python3 scripts/github-mock.py {{ port }} {{ scenario }}
 
-# Lance une instance DMS *isolée* chargeant le worktree comme plugin « Noosphere (dev) »,
-# sans toucher au DMS quotidien. Combiner avec `just mock` dans un autre terminal.
+# Start an *isolated* DMS instance loading this worktree as the "Noosphere (dev)" plugin,
+# leaving the everyday DMS alone. Pair it with `just mock` in another terminal.
 dev-bar:
     @scripts/noosphere-dev "{{ justfile_directory() }}"
 

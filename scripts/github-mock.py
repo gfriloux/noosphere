@@ -1,22 +1,22 @@
 #!/usr/bin/env python3
-"""Mock de l'API GitHub (compare + repo) pour le dev de noosphere.
+"""Mock of the GitHub API (compare + repo), for developing noosphere.
 
-Sert les endpoints utilisés par le service sur http://127.0.0.1:<port>, sans réseau ni
-token réel :
+Serves the endpoints the service uses on http://127.0.0.1:<port>, with no network and no
+real token:
     GET /repos/<owner>/<repo>/compare/<base>...<head>  → { "ahead_by": N, "base_commit", ... }
     GET /repos/<owner>/<repo>                           → { "full_name", "default_branch" }
 
-Les réponses portent `base_commit.sha` et `full_name` parce que le service **vérifie** qu'une
-réponse désigne bien ce qu'il a demandé (`compareBelongsTo` / `repoBelongsTo`, cf. v0.2.1).
-Sans ces champs, le mock est rejeté en silence et tous les inputs restent indéterminés.
+Responses carry `base_commit.sha` and `full_name` because the service **checks** that a
+response names what it asked for (`compareBelongsTo` / `repoBelongsTo`, see v0.2.1). Without
+those fields the mock is silently rejected and every input stays indeterminate.
 
-Usage :
+Usage:
     python3 scripts/github-mock.py [port] [scenario]
-    port     : défaut 8385
-    scenario : drift (défaut) | uptodate | ratelimit | error
-               (aussi lisible via $NOOSPHERE_MOCK_SCENARIO)
+    port     : defaults to 8385
+    scenario : drift (default) | uptodate | ratelimit | error
+               (also read from $NOOSPHERE_MOCK_SCENARIO)
 
-Règle « Base de l'API GitHub (dev) » du plugin sur http://127.0.0.1:<port>.
+Set the plugin's "GitHub API base (dev)" setting to http://127.0.0.1:<port>.
 """
 import json
 import os
@@ -24,7 +24,7 @@ import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse
 
-# Retard simulé par repo (scenario=drift). Un repo absent de la table → 5 par défaut.
+# Simulated lag per repository (scenario=drift). A repository absent from the table → 5.
 AHEAD_BY = {
     "nixpkgs": 214,
     "home-manager": 31,
@@ -33,7 +33,7 @@ AHEAD_BY = {
     "astropath": 0,
 }
 
-# Branche par défaut simulée par repo (résolution des inputs sans ref explicite).
+# Simulated default branch per repository, resolving inputs with no explicit ref.
 DEFAULT_BRANCH = {
     "home-manager": "master",
     "flake-parts": "main",
@@ -69,8 +69,8 @@ def make_handler(scenario):
             # /repos/<owner>/<repo>/compare/<base>...<head>
             if len(parts) >= 5 and parts[0] == "repos" and parts[3] == "compare":
                 repo = parts[2]
-                # `base` = révision verrouillée demandée ; la renvoyer en `base_commit.sha`
-                # est ce qui rattache la réponse à l'input qui l'a demandée.
+                # `base` is the locked revision that was asked about; returning it as
+                # `base_commit.sha` is what attaches the response to the input that asked.
                 base = parts[4].split("...")[0]
                 ahead = 0 if scenario == "uptodate" else AHEAD_BY.get(repo, 5)
                 self._send({"status": "ahead" if ahead else "identical",
@@ -94,11 +94,11 @@ def main():
     scenario = sys.argv[2] if len(sys.argv) > 2 else os.environ.get("NOOSPHERE_MOCK_SCENARIO", "drift")
     server = ThreadingHTTPServer(("127.0.0.1", port), make_handler(scenario))
     print("github-mock : http://127.0.0.1:%d  (scenario=%s)" % (port, scenario))
-    print("  → règle « Base de l'API GitHub (dev) » du plugin sur cette adresse. Ctrl-C pour arrêter.")
+    print("  → set the plugin's \"GitHub API base (dev)\" to this address. Ctrl-C to stop.")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
-        print("\ngithub-mock : arrêt.")
+        print("\ngithub-mock: stopped.")
 
 
 if __name__ == "__main__":

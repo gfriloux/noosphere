@@ -1,9 +1,9 @@
 .pragma library
 
-// Transforms du diff de closure. Fonctions PURES : même sortie `nvd diff` figée → même
-// modèle (cf. golden tests). Entrée = texte brut de `nvd diff`, sortie = modèle noosphere.
+// Closure-diff transforms. PURE functions: the same frozen `nvd diff` output → the same
+// model (see the golden tests). Input = raw `nvd diff` text, output = noosphere's model.
 //
-// Format `nvd diff` (cf. DESIGN.md / fixtures) :
+// `nvd diff` format (see DESIGN.md / the fixtures):
 //   <<< <current>
 //   >>> <target>
 //   Version changes:
@@ -14,9 +14,9 @@
 //   [R.]  #1  oldpkg  1.0
 //   Closure size: 2900 -> 2904 (17 paths added, 13 paths removed, delta +4, disk usage +142.7KiB).
 
-// Sévérité d'un changement (heuristique locale, cf. DESIGN.md) : kernel / firmware / pilote
-// graphique / microcode → `reboot` (l'activation exigera un redémarrage) ; sinon `neutral`.
-// Les badges CVE sont reportés (aucune source d'avis de sécurité fiable en local).
+// A change's severity (local heuristic, see DESIGN.md): kernel / firmware / graphics driver
+// / microcode → `reboot` (activating it will require a restart); otherwise `neutral`.
+// CVE badges are deferred — no reliable local source of security advisories.
 function closureSeverity(name) {
     var n = (name || "").toLowerCase();
     if (n === "linux" || n.indexOf("linux-") === 0 || /(^|-)firmware$/.test(n) || n.indexOf("mesa") === 0 || n.indexOf("nvidia") === 0 || n.indexOf("microcode") !== -1)
@@ -24,7 +24,7 @@ function closureSeverity(name) {
     return "neutral";
 }
 
-// Sévérité maximale de la carte : reboot si un changement l'exige, sinon neutral.
+// The card's maximum severity: reboot if any change demands it, otherwise neutral.
 function cardSeverity(entries) {
     for (var i = 0; i < entries.length; i++)
         if (entries[i].severity === "reboot")
@@ -32,8 +32,8 @@ function cardSeverity(entries) {
     return "neutral";
 }
 
-// Une ligne d'entrée : `[<flags>]  #<n>  <nom>  <valeur>`. Le nom est un token unique (les
-// paquets n'ont pas d'espace) ; la valeur est le reste. `kind` vient de la section courante.
+// One entry line: `[<flags>]  #<n>  <name>  <value>`. The name is a single token (package
+// names carry no space); the value is the rest. `kind` comes from the current section.
 function _entry(line, kind) {
     var m = /^\[[^\]]*\]\s+#\d+\s+(\S+)\s+(.*)$/.exec(line);
     if (!m)
@@ -64,7 +64,7 @@ function _entry(line, kind) {
     };
 }
 
-// Ligne `Closure size: A -> B (… N paths added, M paths removed, …, disk usage ±X).`
+// The `Closure size: A -> B (… N paths added, M paths removed, …, disk usage ±X).` line.
 function _closureLine(line, out) {
     var pa = /(\d+)\s+paths added/.exec(line);
     var pr = /(\d+)\s+paths removed/.exec(line);
@@ -77,7 +77,7 @@ function _closureLine(line, out) {
         out.sizeDelta = du[1].trim();
 }
 
-// Texte `nvd diff` → modèle de closure.
+// `nvd diff` text → the closure model.
 function parseNvdDiff(text) {
     var out = {
         "updated": 0,
@@ -115,7 +115,7 @@ function parseNvdDiff(text) {
                 out.entries.push(e);
         }
     }
-    // Compteurs dérivés des entrées (par type).
+    // Counters derived from the entries, by kind.
     for (var j = 0; j < out.entries.length; j++) {
         var k = out.entries[j].kind;
         if (k === "changed")

@@ -12,7 +12,7 @@ TestCase {
             var input = Golden.readJson(Qt.resolvedUrl("fixtures/" + c.name + ".json"));
             var expected = Golden.readJson(Qt.resolvedUrl("golden/" + c.name + ".json"));
             var actual = c.transform(input);
-            verify(Golden.equal(actual, expected), "golden '" + c.name + "' ne correspond pas\n" + "--- attendu ---\n" + Golden.pretty(expected) + "\n" + "--- obtenu ---\n" + Golden.pretty(actual));
+            verify(Golden.equal(actual, expected), "golden '" + c.name + "' does not match\n" + "--- expected ---\n" + Golden.pretty(expected) + "\n" + "--- actual ---\n" + Golden.pretty(actual));
         }
     }
 }

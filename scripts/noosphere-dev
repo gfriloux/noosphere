@@ -1,21 +1,21 @@
 #!/usr/bin/env bash
-# noosphere-dev — lance une instance DankMaterialShell *isolée* qui ne charge QUE le plugin
-# noosphere du worktree courant. Sert à tester la version en cours sans toucher au DMS
-# quotidien (géré, lui, par le module home-manager).
+# noosphere-dev — starts an *isolated* DankMaterialShell instance loading ONLY the noosphere
+# plugin from the current worktree. For testing work in progress without disturbing the
+# everyday DMS, which the home-manager module owns.
 #
-# Isolation : XDG_CONFIG_HOME + XDG_CACHE_HOME dédiés → settings, dossier de plugins et
-# qmlcache séparés de l'instance quotidienne. Le plugin pointe en symlink (live) sur le
-# src/ du worktree : on édite, on relance, c'est visible (cache isolé → pas de purge).
+# Isolation: dedicated XDG_CONFIG_HOME + XDG_CACHE_HOME → settings, plugin directory and
+# qmlcache separate from the everyday instance. The plugin symlinks the worktree's src/
+# live: edit, restart, see it — the isolated cache means nothing to purge.
 #
-# L'id du manifeste reste "noosphere" : il doit rester aligné avec `pluginId` dans
-# src/view/Settings.qml (sinon les réglages sont écrits/lus sous des clés différentes).
-# Seul le libellé affiché passe à "Noosphere (dev)" pour distinguer les deux barres.
+# The manifest id stays "noosphere": it must match `pluginId` in src/view/Settings.qml, or
+# the settings are written and read under different keys. Only the displayed name becomes
+# "Noosphere (dev)", to tell the two bars apart.
 #
-# Astuce dev : lancer d'abord `just mock` dans un autre terminal, puis régler l'endpoint
-# GitHub du plugin sur http://127.0.0.1:8385 (aucun réseau requis).
+# Tip: start `just mock` in another terminal first, then point the plugin's GitHub endpoint
+# at http://127.0.0.1:8385 — no network needed.
 set -euo pipefail
 
-# Racine du dépôt (contient plugin.json + src/). Défaut : répertoire courant.
+# Repository root (holding plugin.json + src/). Defaults to the current directory.
 if [ "$#" -gt 0 ]; then
     src="$1"
     shift
@@ -24,19 +24,23 @@ else
 fi
 src="$(cd "$src" && pwd)"
 
-if [ ! -f "$src/plugin.json" ] || [ ! -d "$src/src" ]; then
-    echo "noosphere-dev : '$src' ne contient pas plugin.json + src/ (pointe la racine du dépôt)." >&2
+# translations/ is checked alongside the other two. Left unchecked, `ln -sfn` would happily
+# create a DANGLING symlink, and DMS's loader sets `printErrors: false` and simply tries the
+# next locale candidate — so the dev bar would come up English with nothing in the log. That
+# is the failure Review Focus 1 names, one layer down.
+if [ ! -f "$src/plugin.json" ] || [ ! -d "$src/src" ] || [ ! -d "$src/translations" ]; then
+    echo "noosphere-dev: '$src' holds no plugin.json + src/ + translations/ — point at the repository root." >&2
     exit 1
 fi
-command -v dms >/dev/null || { echo "noosphere-dev : 'dms' introuvable sur le PATH." >&2; exit 1; }
-command -v jq  >/dev/null || { echo "noosphere-dev : 'jq' introuvable sur le PATH." >&2; exit 1; }
-command -v quickshell >/dev/null || { echo "noosphere-dev : 'quickshell' introuvable (entrer dans le dev shell : nix develop)." >&2; exit 1; }
+command -v dms >/dev/null || { echo "noosphere-dev: 'dms' not found on PATH." >&2; exit 1; }
+command -v jq  >/dev/null || { echo "noosphere-dev: 'jq' not found on PATH." >&2; exit 1; }
+command -v quickshell >/dev/null || { echo "noosphere-dev: 'quickshell' not found (enter the dev shell: nix develop)." >&2; exit 1; }
 
 # DMS shell root, resolved through the installed binary — no store hash pinned.
 # Same resolution as scripts/qml-import-paths.
 dms_bin="$(readlink -f "$(command -v dms)")"
 dms_shell="${dms_bin%/bin/dms}/share/quickshell/dms"
-[ -d "$dms_shell" ] || { echo "noosphere-dev : racine du shell DMS introuvable ($dms_shell)." >&2; exit 1; }
+[ -d "$dms_shell" ] || { echo "noosphere-dev: DMS shell root not found ($dms_shell)." >&2; exit 1; }
 
 root="${XDG_STATE_HOME:-$HOME/.local/state}/noosphere-dev"
 export XDG_CONFIG_HOME="$root/config"
@@ -46,18 +50,22 @@ export XDG_STATE_HOME="$root/state"
 plugindir="$XDG_CONFIG_HOME/DankMaterialShell/plugins/Noosphere"
 mkdir -p "$plugindir"
 
-# plugin.json dérivé du worktree : seul le libellé change, l'id reste "noosphere".
+# plugin.json derived from the worktree: only the displayed name changes, the id stays "noosphere".
 jq '.name = "Noosphere (dev)"' "$src/plugin.json" >"$plugindir/plugin.json"
-# src live : symlink hors-store vers le worktree.
+# src/ and translations/ live: out-of-store symlinks into the worktree. The table is
+# symlinked rather than copied for the same reason as the source — DMS re-reads it when the
+# plugin reloads, so an edit to fr.json shows up on the next restart with nothing to copy.
 ln -sfn "$src/src" "$plugindir/src"
+ln -sfn "$src/translations" "$plugindir/translations"
 
-echo "noosphere-dev : instance DMS isolée"
+echo "noosphere-dev: isolated DMS instance"
 echo "  source : $src/src (live)"
+echo "  i18n   : $src/translations (live)"
 echo "  config : $XDG_CONFIG_HOME"
 echo "  cache  : $XDG_CACHE_HOME"
-echo "  → active 'Noosphere (dev)' dans CETTE instance (Settings → Plugins)."
-echo "  → règle l'endpoint GitHub du plugin sur http://127.0.0.1:8385 (avec 'just mock')."
-echo "  (Ctrl-C pour arrêter l'instance dev.)"
+echo "  → enable 'Noosphere (dev)' in THIS instance (Settings → Plugins)."
+echo "  → point the plugin's GitHub endpoint at http://127.0.0.1:8385 (with 'just mock')."
+echo "  (Ctrl-C to stop the dev instance.)"
 
 # Launch the UI through `quickshell` directly, not through `dms run`.
 #

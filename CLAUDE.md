@@ -38,11 +38,15 @@ tmp/, .superpowers/      ← uncommitted scratch (notes; agent ledgers and brief
 ## Language
 
 English is the project's default language — documents, code comments, commit messages, and
-the software's own copy. **The UI copy is French today** and stays French until the
-English/i18n plan lands; a French UI string is quoted when a document describes it, never
-silently translated as a side effect of another change. This rule **differs from
-astropath's** ("English docs, French UI") — do not copy astropath's version here. Details,
-including the published changelog and GitHub Issues: `PROCEDURE_PLANS.md` §8.
+**the UI itself**. Since v0.5.0 every user-facing string is an English literal wrapped in
+`I18n.trFor("noosphere", "<English>")`; French is a **translation**, `translations/fr.json`,
+which DMS loads on its own. So: **new UI copy is written in English and wrapped**, and its
+French entry lands in the same commit — `just check-translations` fails otherwise, in both
+directions. Never add an unwrapped literal: the gate compares the table against the ids, not
+the language of an id, so an unwrapped French string would pass and could never be
+translated away. This rule **differs from astropath's** ("English docs, French UI") — do not
+copy astropath's version here. Details, including the published changelog and GitHub Issues:
+`PROCEDURE_PLANS.md` §8.
 
 ## Dev environment
 
@@ -57,9 +61,10 @@ For non-interactive commands: `nix develop --command just ci`.
 ## Commands
 
 ```bash
-just ci          # full gate: fmt-check + check-manifest + test + lint
+just ci          # full gate: fmt-check + check-manifest + check-translations + test + lint
 just ci-hermetic # all but lint — the subset CI runs (a runner has no DMS)
 just check-manifest # plugin.json against DMS's published schema
+just check-translations # translations/ against the strings src/ renders, both directions
 just fmt         # qmlformat -i (formats in place)
 just fmt-check   # checks formatting, fails if non-conforming
 just lint        # qmllint, blocking at zero — needs DMS installed (PROCEDURE_PLANS.md §4)

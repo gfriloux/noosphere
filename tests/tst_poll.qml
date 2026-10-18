@@ -170,7 +170,7 @@ TestCase {
         drive(s, responder(2));
         var cs = Poll.commitStatus(s);
         compare(cs.connectionStatus, "live");
-        compare(cs.errorMessage, "");
+        compare(cs.cause, "");
         compare(cs.touchLastCheck, true);
     }
 
@@ -188,7 +188,7 @@ TestCase {
         });
         var cs = Poll.commitStatus(s);
         compare(cs.connectionStatus, "error");
-        verify(cs.errorMessage.length > 0);
+        compare(cs.cause, "nothing-verified");
         compare(cs.touchLastCheck, false);
     }
 
@@ -232,13 +232,137 @@ TestCase {
             };
         });
         compare(eff.kind, "fail");
-        compare(eff.message, "limite d'API GitHub atteinte");
+        compare(eff.cause, "rate-limited");
     }
 
     function test_poll_metaUnparseable() {
         var s = st();
         var eff = Poll.begin(s, "not json at all");
         compare(eff.kind, "fail");
+        compare(eff.cause, "metadata-unreadable");
+    }
+
+    // ---- The cause codes themselves ----
+    //
+    // Every code below is a string Cockpit.qml's causeText() switches on. Nothing else in
+    // the repository pins them: `just test` only asserted `kind === "fail"`,
+    // check-translations compares the English ids in causeText (which a model-side rename
+    // leaves untouched), and qmllint cannot see across the JS boundary. So a renamed code
+    // would make the cockpit fall through to "check failed" for a cause it knows, with
+    // every gate green. These assertions are that missing link.
+
+    function test_cause_flakeUnreadable() {
+        var s = st();
+        var eff = Poll.onMetaFailed(s, 127);
+        compare(eff.kind, "fail");
+        compare(eff.cause, "flake-unreadable");
+        compare(eff.status, 127);
+    }
+
+    function test_cause_watchdogTimeout() {
+        var s = st();
+        drive(s, responder(0)); // queue spent, nothing in flight
+        var eff = Poll.onWatchdog(s);
+        compare(eff.kind, "fail");
+        compare(eff.cause, "watchdog-timeout");
+    }
+
+    function test_cause_tokenRefused() {
+        var s = st();
+        var eff = drive(s, function (url) {
+            return {
+                "status": 401,
+                "text": ""
+            };
+        });
+        compare(eff.kind, "fail");
+        compare(eff.cause, "token-refused");
+        compare(eff.status, 401);
+    }
+
+    function test_cause_forbidden() {
+        var s = st();
+        var eff = drive(s, function (url) {
+            return {
+                "status": 403,
+                "text": JSON.stringify({
+                    "message": "Resource not accessible"
+                })
+            };
+        });
+        compare(eff.kind, "fail");
+        compare(eff.cause, "forbidden");
+    }
+
+    // ---- The non-fatal causes reach the commit ----
+    //
+    // A non-fatal error only makes its own input indeterminate, so the poll advances and the
+    // cause used to be forgotten. But when EVERY input fails that way the poll still commits
+    // with nothing verified — the commonest failure there is, a machine with no network — and
+    // the status row then has to say more than "no input could be verified".
+
+    function test_commitStatus_detailOffline() {
+        var s = st();
+        drive(s, function (url) {
+            return {
+                "status": 0,
+                "text": ""
+            };
+        });
+        var cs = Poll.commitStatus(s);
+        compare(cs.connectionStatus, "error");
+        compare(cs.cause, "nothing-verified");
+        compare(cs.detail, "offline");
+    }
+
+    function test_commitStatus_detailTimeout() {
+        var s = st();
+        drive(s, function (url) {
+            return {
+                "status": 0,
+                "text": "",
+                "timedOut": true
+            };
+        });
+        compare(Poll.commitStatus(s).detail, "timeout");
+    }
+
+    // 5xx carries its status too, so the view can render "GitHub unavailable (503)".
+    function test_commitStatus_detailUnavailable() {
+        var s = st();
+        drive(s, function (url) {
+            return {
+                "status": 503,
+                "text": ""
+            };
+        });
+        var cs = Poll.commitStatus(s);
+        compare(cs.detail, "unavailable");
+        compare(cs.status, 503);
+    }
+
+    // A verified poll publishes no detail at all.
+    function test_commitStatus_verifiedHasNoDetail() {
+        var s = st();
+        drive(s, responder(1));
+        var cs = Poll.commitStatus(s);
+        compare(cs.detail, "");
+        compare(cs.status, 0);
+    }
+
+    // A fresh poll must forget the previous one's cause: otherwise a poll that fails to
+    // verify anything for a NEW reason would publish the old reason.
+    function test_commitStatus_detailResetsBetweenPolls() {
+        var s = st();
+        drive(s, function (url) {
+            return {
+                "status": 503,
+                "text": ""
+            };
+        });
+        compare(Poll.commitStatus(s).detail, "unavailable");
+        drive(s, responder(0));
+        compare(Poll.commitStatus(s).detail, "");
     }
 
     // ---- Attribution and abort: DESIGN invariant 10, made testable ----

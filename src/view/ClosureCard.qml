@@ -1,6 +1,7 @@
-// Carte DIFF DE CLOSURE (v0.2.0). Pilotée par le service Closure (`service`) : bouton de
-// prévisualisation (idle), spinner (build/diff), résumé + console des changements (ready),
-// message d'erreur (error). Lecture seule : le bouton build sans activer (cf. DESIGN.md).
+// The closure-diff card (v0.2.0). Driven by the Closure service (`service`): a preview
+// button (idle), a spinner (build/diff), a summary plus a console of the changes (ready),
+// an error message (error). Read-only: the button builds without activating (see
+// DESIGN.md).
 import QtQuick
 import qs.Common
 import qs.Widgets
@@ -10,9 +11,9 @@ Rectangle {
     id: card
 
     property var service
-    // Inputs en retard vus par le service de dérive. Sert à distinguer « rien à faire » de
-    // « il y a du retard, mais on ne sait pas le prévisualiser » : sans cette information la
-    // carte contredirait la liste des inputs affichée juste au-dessus.
+    // The inputs the drift service sees as behind. This is what separates "nothing to do"
+    // from "something is behind but we cannot preview it": without it the card would
+    // contradict the input list shown directly above it.
     property int behindCount: 0
 
     readonly property var diff: service ? service.diff : null
@@ -26,7 +27,7 @@ Rectangle {
     color: "#313244"
     implicitHeight: col.implicitHeight + 28
 
-    // Liseré gauche inséré (épouse les coins arrondis).
+    // Inset left edge, following the rounded corners.
     Rectangle {
         anchors.left: parent.left
         anchors.top: parent.top
@@ -47,7 +48,7 @@ Rectangle {
         anchors.bottomMargin: 14
         spacing: 9
 
-        // En-tête de carte.
+        // Card header.
         Item {
             width: parent.width
             height: 20
@@ -65,7 +66,7 @@ Rectangle {
                 }
                 StyledText {
                     anchors.verticalCenter: parent.verticalCenter
-                    text: "DIFF DE CLOSURE"
+                    text: I18n.trFor("noosphere", "CLOSURE DIFF")
                     font.family: Theme.defaultMonoFontFamily
                     font.pixelSize: Theme.fontSizeSmall
                     font.weight: Font.DemiBold
@@ -74,7 +75,7 @@ Rectangle {
                 }
             }
 
-            // Statut à droite (build… / diff… / erreur).
+            // Status on the right (building… / diffing… / error).
             StyledText {
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
@@ -82,13 +83,13 @@ Rectangle {
                 text: {
                     switch (card.status) {
                     case "resolving":
-                        return "résolution de l'hôte…";
+                        return I18n.trFor("noosphere", "resolving host…");
                     case "building":
-                        return "build…";
+                        return I18n.trFor("noosphere", "building…");
                     case "diffing":
-                        return "diff…";
+                        return I18n.trFor("noosphere", "diffing…");
                     case "error":
-                        return "échec";
+                        return I18n.trFor("noosphere", "failed");
                     default:
                         return "";
                     }
@@ -99,24 +100,24 @@ Rectangle {
             }
         }
 
-        // Nombre d'inputs en retard à prévisualiser (overrides vers l'amont).
+        // How many inputs behind there are to preview (overrides onto upstream).
         readonly property int updateCount: (card.service && card.service.overrides) ? card.service.overrides.length : 0
-        // Du retard existe mais aucun input n'est prévisualisable : leur amont n'a pas été
-        // résolu (type non-github, dépôt injoignable, réponse GitHub écartée). On le dit,
-        // plutôt que d'annoncer « aucun input en retard » à contre-sens de la liste.
+        // Something is behind but nothing is previewable: no upstream was resolved for any
+        // of them (non-github type, unreachable repository, discarded GitHub response). Say
+        // so, rather than claiming "nothing is behind" against what the list shows.
         readonly property bool unpreviewable: col.updateCount === 0 && card.behindCount > 0
 
-        // --- idle, rien à mettre à jour : note ---
+        // --- idle, nothing to update: a note ---
         StyledText {
             visible: card.status === "idle" && col.updateCount === 0
             width: parent.width
-            text: col.unpreviewable ? (card.behindCount === 1 ? "1 input en retard — amont non résolu, rien à prévisualiser" : card.behindCount + " inputs en retard — amont non résolu, rien à prévisualiser") : "aucun input en retard — rien à prévisualiser"
+            text: col.unpreviewable ? (card.behindCount === 1 ? I18n.trFor("noosphere", "%1 input behind — upstream unresolved, nothing to preview").arg(card.behindCount) : I18n.trFor("noosphere", "%1 inputs behind — upstream unresolved, nothing to preview").arg(card.behindCount)) : I18n.trFor("noosphere", "no input behind — nothing to preview")
             wrapMode: Text.WordWrap
             font.pixelSize: Theme.fontSizeSmall
             color: col.unpreviewable ? "#f9e2af" : "#6c7086"
         }
 
-        // --- idle : bouton de prévisualisation (build de la config mise à jour, à la demande) ---
+        // --- idle: the preview button (builds the updated configuration, on demand) ---
         Rectangle {
             visible: card.status === "idle" && col.updateCount > 0
             width: parent.width
@@ -138,7 +139,7 @@ Rectangle {
                 }
                 StyledText {
                     anchors.verticalCenter: parent.verticalCenter
-                    text: "prévisualiser la mise à jour (" + col.updateCount + ")"
+                    text: I18n.trFor("noosphere", "preview the update (%1)").arg(col.updateCount)
                     font.pixelSize: Theme.fontSizeSmall
                     font.weight: Font.DemiBold
                     color: "#89b4fa"
@@ -154,7 +155,7 @@ Rectangle {
             }
         }
 
-        // --- building / diffing / resolving : spinner + libellé ---
+        // --- building / diffing / resolving: spinner + label ---
         Row {
             visible: card.service && card.service.busy
             spacing: 8
@@ -175,13 +176,13 @@ Rectangle {
             }
             StyledText {
                 anchors.verticalCenter: parent.verticalCenter
-                text: card.status === "building" ? "build de la config mise à jour (sans activation)…" : (card.status === "diffing" ? "calcul du diff de closure…" : "résolution de l'hôte…")
+                text: card.status === "building" ? I18n.trFor("noosphere", "building the updated config (without activating)…") : (card.status === "diffing" ? I18n.trFor("noosphere", "computing the closure diff…") : I18n.trFor("noosphere", "resolving host…"))
                 font.pixelSize: Theme.fontSizeSmall
                 color: "#a6adc8"
             }
         }
 
-        // --- error : message + réessayer ---
+        // --- error: message + retry ---
         StyledText {
             visible: card.isError
             width: parent.width
@@ -213,7 +214,7 @@ Rectangle {
                 }
                 StyledText {
                     anchors.verticalCenter: parent.verticalCenter
-                    text: "réessayer"
+                    text: I18n.trFor("noosphere", "retry")
                     font.pixelSize: Theme.fontSizeSmall
                     color: "#f38ba8"
                 }
@@ -228,25 +229,25 @@ Rectangle {
             }
         }
 
-        // --- ready : résumé + console ---
+        // --- ready: summary + console ---
         Row {
             visible: card.status === "ready" && card.diff
             spacing: 6
 
             StyledText {
-                text: (card.diff ? card.diff.updated : 0) + " màj"
+                text: I18n.trFor("noosphere", "%1 updated").arg(card.diff ? card.diff.updated : 0)
                 font.family: Theme.defaultMonoFontFamily
                 font.pixelSize: Theme.fontSizeSmall
                 color: "#f9e2af"
             }
             StyledText {
-                text: "· " + (card.diff ? card.diff.added : 0) + " ajoutés"
+                text: "· " + I18n.trFor("noosphere", "%1 added").arg(card.diff ? card.diff.added : 0)
                 font.family: Theme.defaultMonoFontFamily
                 font.pixelSize: Theme.fontSizeSmall
                 color: "#a6e3a1"
             }
             StyledText {
-                text: "· " + (card.diff ? card.diff.removed : 0) + " retirés"
+                text: "· " + I18n.trFor("noosphere", "%1 removed").arg(card.diff ? card.diff.removed : 0)
                 font.family: Theme.defaultMonoFontFamily
                 font.pixelSize: Theme.fontSizeSmall
                 color: "#f38ba8"
@@ -260,7 +261,7 @@ Rectangle {
             }
         }
 
-        // Console des changements (scroll si longue).
+        // Console of the changes, scrolling when long.
         Rectangle {
             visible: card.status === "ready" && card.diff && card.diff.entries.length > 0
             width: parent.width
@@ -290,7 +291,7 @@ Rectangle {
                         anchors.verticalCenter: parent.verticalCenter
                         spacing: 6
 
-                        // Marqueur ▲ (reboot) ou espace d'alignement.
+                        // The ▲ reboot marker, or an alignment space.
                         StyledText {
                             width: 10
                             text: row.reboot ? "▲" : ""
@@ -313,21 +314,21 @@ Rectangle {
                         }
                         StyledText {
                             visible: row.modelData.kind === "added"
-                            text: "ajouté"
+                            text: I18n.trFor("noosphere", "added")
                             font.family: Theme.defaultMonoFontFamily
                             font.pixelSize: Theme.fontSizeSmall
                             color: "#a6e3a1"
                         }
                         StyledText {
                             visible: row.modelData.kind === "removed"
-                            text: "retiré"
+                            text: I18n.trFor("noosphere", "removed")
                             font.family: Theme.defaultMonoFontFamily
                             font.pixelSize: Theme.fontSizeSmall
                             color: "#f38ba8"
                         }
                     }
 
-                    // Badge REBOOT à droite.
+                    // REBOOT badge on the right.
                     Rectangle {
                         visible: row.reboot
                         anchors.right: parent.right
@@ -340,7 +341,7 @@ Rectangle {
                         StyledText {
                             id: rebootText
                             anchors.centerIn: parent
-                            text: "REBOOT"
+                            text: I18n.trFor("noosphere", "REBOOT")
                             font.family: Theme.defaultMonoFontFamily
                             font.pixelSize: 9
                             font.weight: Font.DemiBold
@@ -352,7 +353,7 @@ Rectangle {
             }
         }
 
-        // Relancer un aperçu quand un diff est déjà affiché.
+        // Re-run a preview when a diff is already on screen.
         Rectangle {
             visible: card.status === "ready"
             width: rerunRow.implicitWidth + 20
@@ -375,7 +376,7 @@ Rectangle {
                 }
                 StyledText {
                     anchors.verticalCenter: parent.verticalCenter
-                    text: "recalculer"
+                    text: I18n.trFor("noosphere", "recompute")
                     font.pixelSize: Theme.fontSizeSmall
                     color: "#89b4fa"
                 }

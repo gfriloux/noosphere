@@ -1,9 +1,9 @@
 {
   description = ''
-    noosphere — widget de suivi de dérive de flake NixOS pour Quickshell / DankMaterialShell.
-    Badge de barre (état de dérive) + cockpit listant les inputs et leur retard sur l'amont.
-    Données via `nix flake metadata --json` (local) et l'API compare de GitHub (amont).
-    Lecture seule : noosphere observe, il ne mute pas le système.
+    noosphere — a NixOS flake drift tracker widget for Quickshell / DankMaterialShell.
+    A bar badge (the drift state) plus a cockpit listing the inputs and how far each lags
+    behind upstream. Data from `nix flake metadata --json` (local) and GitHub's compare API
+    (upstream). Read-only: noosphere observes, it does not mutate the system.
   '';
 
   inputs = {
@@ -26,7 +26,7 @@
       flake.homeModules.default = import ./nix/hm-module.nix;
 
       perSystem = {pkgs, ...}: let
-        # Launcher d'instance DMS isolée pour tester le worktree (cf. scripts/noosphere-dev).
+        # Launcher for an isolated DMS instance to test the worktree (see scripts/noosphere-dev).
         noosphere-dev = pkgs.writeShellApplication {
           name = "noosphere-dev";
           runtimeInputs = [pkgs.jq];
@@ -44,36 +44,36 @@
         devShells.default = pkgs.mkShell {
           name = "noosphere";
           packages = with pkgs; [
-            # Runtime / cible (bless via quickshell, lint/format/test via Qt6)
+            # Runtime / target (bless through quickshell, lint/format/test through Qt6)
             quickshell
             qt6.qtdeclarative # qmllint, qmlformat, qmltestrunner
             qt6.qtbase
 
-            # Runtime du service : lit le flake local (nix) ; nvd calcule le diff de closure
-            # (build à la demande, cf. DESIGN.md). curl n'est plus un runtime — l'amont GitHub
-            # est interrogé par le service — mais reste ici pour recouper un retard à la main.
+            # Service runtime: reads the local flake (nix); nvd computes the closure diff
+            # (built on demand, see DESIGN.md). curl is no longer a runtime dependency — the
+            # service queries GitHub itself — but stays here to cross-check a lag by hand.
             nix
             curl
             nvd
 
-            # Dev : mock du compare GitHub (just mock) + instance DMS isolée (just dev-bar)
+            # Dev: the GitHub compare mock (just mock) + an isolated DMS instance (just dev-bar)
             python3
             jq
 
-            # Outillage projet
+            # Project tooling
             just
             git
-            git-cliff # changelog depuis les Conventional Commits (just changelog)
+            git-cliff # changelog from the Conventional Commits (just changelog)
 
-            # Portes Nix (cf. .pre-commit-config.yaml)
+            # Nix gates (see .pre-commit-config.yaml)
             alejandra
             deadnix
           ];
 
           shellHook = ''
             echo ""
-            echo "  noosphere — suivi de dérive de flake NixOS pour Quickshell / DankMaterialShell"
-            echo "  qmllint/qmlformat/qmltestrunner prêts."
+            echo "  noosphere — NixOS flake drift tracker for Quickshell / DankMaterialShell"
+            echo "  qmllint/qmlformat/qmltestrunner ready."
             echo "  just ci"
             echo ""
           '';
