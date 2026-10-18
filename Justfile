@@ -22,8 +22,7 @@ fmt-check:
 
 # Static QML lint (qmllint), with every import resolved through Quickshell's own generated
 # VFS — see scripts/qml-import-paths for why `-I` alone cannot resolve DMS's qs.* modules.
-# NOT YET BLOCKING: qmllint exits 0 whatever it finds, and making this recipe fail is the
-# next step of the issues-pass plan. It reports, for now.
+# Blocking at ZERO output lines.
 lint:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -38,7 +37,23 @@ lint:
         echo "lint: no import path resolved — refusing to lint without them" >&2
         exit 1
     fi
-    find src -name '*.qml' -print0 2>/dev/null | xargs -0 -r qmllint "${args[@]}"
+    mapfile -t files < <(find src -name '*.qml' | sort)
+    raw="$(qmllint "${args[@]}" "${files[@]}" 2>&1 || true)"
+    # qmllint exits 0 whatever it finds — that was this gate's bug. The gate is this filter
+    # plus the emptiness test below, never qmllint's exit code.
+    #
+    # Two classes are dropped as known-bogus, both artefacts of Quickshell synthesising its
+    # module metadata instead of shipping qmldir files. Neither can hide anything about our
+    # own code; delete a filter the day its cause is gone.
+    findings="$(printf '%s\n' "$raw" \
+        | grep -vE 'not declared as singleton in qmldir but using pragma Singleton' \
+        | grep -vE 'PostReloadHook was not found' \
+        | grep -E 'Warning:|Error:|Info:' || true)"
+    if [ -n "$findings" ]; then
+        printf '%s\n' "$findings" >&2
+        printf 'lint: %s finding(s) — this gate blocks at zero\n' "$(printf '%s\n' "$findings" | grep -c .)" >&2
+        exit 1
+    fi
 
 # Tests golden : qmltestrunner exécute les transforms JS sur fixtures → compare aux goldens.
 test:

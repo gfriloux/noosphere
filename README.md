@@ -58,10 +58,11 @@ nix develop
 just ci        # full gate: fmt-check + lint + test
 ```
 
-> **The `lint` leg currently guards nothing.** `qmllint` runs with no `-I` import path, so it
-> fails at `import QtQuick`, cascades into unresolved-type noise, and still exits 0 — 717
-> warning lines on a green run. A green `just ci` proves `fmt-check` and `test`, and nothing
-> about QML. Tracked in [issue #6](https://github.com/gfriloux/noosphere/issues/6).
+> **The `lint` leg needs DankMaterialShell installed.** `qmllint` cannot resolve DMS's `qs.*`
+> modules on its own, so `scripts/qml-import-paths` has Quickshell generate the import paths
+> and feeds them in; without DMS the recipe fails rather than linting less. The gate blocks at
+> zero findings. **CI does not run it** — no DMS there — and prints a line saying so, so a
+> green CI run never implies the QML was checked.
 
 Other targets: `just test` (golden + Qt Quick Test), `just fmt` (formats the QML),
 `just bless` (regenerates the goldens — read the diff), `just changelog` (regenerates
