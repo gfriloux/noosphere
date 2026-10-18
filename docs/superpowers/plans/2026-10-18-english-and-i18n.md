@@ -407,3 +407,42 @@ which were not and why.
 **Phase 0 (2026-10-18, `main` @ `1558acb`):** `nix develop --command just ci` → **exit 0**,
 70 passed / 0 failed, `lint: 0 findings over 7 file(s), 47 import path(s)`. Working tree
 clean apart from the untracked spec and plan for this work.
+
+---
+
+## Manual validation
+
+**2026-10-18, branch `feat/v0.5.0-english-and-i18n`.** Run on an isolated DMS instance
+(`just dev-bar`), DMS locale `fr`, against the maintainer's real flake (10 inputs, 7 behind).
+
+Exercised, on screen:
+
+- **The cockpit reads French throughout** — header (`génération n°432 · activée il y a 5 h`,
+  `check amont · il y a 1 min`), INPUTS (`7 en retard · 2 à jour`, `29 commits de retard`,
+  `à jour`, the indeterminate `—`), the closure card (`DIFF DE CLOSURE`,
+  `prévisualiser la mise à jour (7)`) and the footer (`cadence 5 min`, `check maintenant`).
+  No mixed-language card.
+- **The settings panel reads French throughout**, every label, description and placeholder,
+  with `v0.5.0` in the plugin header.
+- **Review Focus 4 (a string that does not fit its slot): one defect found and fixed.** The
+  `dms` row's lock age wrapped onto a second line inside a row fixed at 30px — DMS's
+  `StyledText` defaults to `WordWrap` and `elide` is inert while a text may wrap. French
+  only: `lock 31 d ago` fits beside a channel chip, `lock il y a 31 j` does not. Fixed in
+  `53afba5`, re-checked on screen: the row now elides on one line.
+
+Not exercised, and why:
+
+- **English on screen.** The maintainer's desktop is French and switching the shell locale
+  was not worth the disruption. Covered instead by construction — English is the *source*,
+  rendered when a lookup misses — and by a probe that confirmed `trFor` returns the term
+  unchanged with no table registered.
+- **DMS < 1.6.0.** Not installed anywhere here, and installing an older DMS to watch a
+  widget break is not worth it. The failure mode is argued from the API's absence
+  (`I18n.trFor` does not exist before 1.6.0) and warned about in `README.md`.
+- **A real GitHub rate-limit or outage.** The error causes were exercised through the mock
+  and the pure `poll.js` scenario tests, not against GitHub refusing service for real.
+
+A caveat for the next person: a dev instance can serve a **stale compiled QML** even though
+`src/` is symlinked live — the first run of this check showed the pre-branch settings panel
+beside an up-to-date cockpit. Wipe `${XDG_STATE_HOME}/noosphere-dev/cache` before trusting
+what you see.
