@@ -43,3 +43,12 @@ repos:
         entry: just check-manifest
         files: ^plugin\.json$
         pass_filenames: false
+      # Keyed on both sides of the pairing: the gate compares src/'s wrapped strings against
+      # translations/, so a change to either can break it. Keyed on translations/ alone, a
+      # renamed UI string would land untranslated.
+      - id: check-translations
+        name: check-translations
+        language: system
+        entry: just check-translations
+        files: ^src/|^translations/
+        pass_filenames: false

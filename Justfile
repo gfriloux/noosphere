@@ -9,7 +9,7 @@ ci: ci-hermetic lint
 # CI runs, because a GitHub runner has no DMS and therefore cannot resolve the QML imports
 # (see scripts/qml-import-paths). Naming it here keeps the Justfile the single definition of
 # both gates, with the difference between them explicit instead of duplicated in ci.yml.
-ci-hermetic: fmt-check check-manifest test
+ci-hermetic: fmt-check check-manifest check-translations test
 
 # Format the QML in place (qmlformat).
 fmt:
@@ -85,6 +85,12 @@ lint:
 # and this is the one gate CI can run: it needs neither DMS nor Quickshell.
 check-manifest:
     @scripts/check-manifest
+
+# Check the translation tables against the strings src/ renders. Both directions: a string
+# with no entry, and an entry no string uses. Hermetic like check-manifest — jq and grep
+# only, no DMS.
+check-translations:
+    @scripts/check-translations
 
 # Golden tests: qmltestrunner runs the JS transforms on the fixtures and compares against
 # the goldens.
