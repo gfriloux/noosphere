@@ -108,11 +108,16 @@ just ci          # all three in a row
 > **The `lint` gate is currently blind.** `qmllint` runs with no `-I` import path, so it
 > fails at `import QtQuick`, cascades into unresolved-type noise, and **still exits 0** —
 > `just ci` stays green whatever the QML does. Tracked with its measurements in **issue #6**.
-> Measured 2026-10-18, `src/` identical to `main` @ `900c54b`, with
-> `nix develop --command just lint 2>&1 | grep -c Warning`: **717** warning lines, of which
-> **4** are `Failed to import` (`QtQuick`, `qs.Common`, `qs.Widgets`, `qs.Modules.Plugins` —
-> note that `Quickshell.Io` and `QtQuick.Layouts` do resolve), and the recipe still exits 0.
+> Measured 2026-10-18 on `main` @ `14ee1a6` with
+> `nix develop --command just lint 2>&1 | grep -c Warning`, three consecutive identical runs:
+> **721** warning lines, of which **6** are `Failed to import` — `QtQuick`, `Quickshell.Io`,
+> `QtQuick.Layouts`, `qs.Common`, `qs.Widgets`, `qs.Modules.Plugins`, i.e. every external
+> import, which is what no `-I` at all produces. The recipe still exits 0.
 > Until it is fixed, a green `just ci` proves `fmt-check` and `test`, and nothing about QML.
+>
+> *(This block previously said 717 and 4, and claimed `Quickshell.Io` resolves. Both were
+> wrong: those figures came from a run that already had `-I` for Qt and Quickshell. Any
+> measurement recorded here travels with the command that produced it.)*
 
 ## 5. Determinism — goldens on the data layer
 
