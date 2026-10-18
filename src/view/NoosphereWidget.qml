@@ -1,6 +1,15 @@
 // Widget de barre noosphere (plugin DankMaterialShell).
 // Badge d'état : glyphe rosace coloré par l'état de dérive + pastille compteur d'inputs en
 // retard. Au clic, ouvre le cockpit (Cockpit.qml). Lecture seule : aucune mutation.
+//
+// `ComponentBehavior: Bound`: the two Components below (bar pill, popout) are instantiated
+// by DMS, not by us, so they cannot be given `required property` values — the instantiator
+// knows nothing about them. The pragma captures the enclosing component's ids (`root`,
+// `svc`, `closureSvc`) instead of resolving them dynamically, which is exactly what this
+// code means. There is no model delegate in this file, so the pragma has no other semantics
+// to change here.
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import qs.Common
 import qs.Widgets

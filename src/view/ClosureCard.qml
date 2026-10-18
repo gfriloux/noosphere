@@ -4,7 +4,6 @@
 import QtQuick
 import qs.Common
 import qs.Widgets
-import qs.Modules.Plugins
 import "../model/closure.js" as Closure
 
 Rectangle {

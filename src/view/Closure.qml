@@ -74,10 +74,16 @@ QtObject {
                     root._fail("hostname introuvable");
             }
         }
+        // qmllint disable signal-handler-parameters
+        // `exited(int, QProcess::ExitStatus)`: the second parameter is a C++ enum Quickshell
+        // does not register for QML, so qmllint cannot resolve it and refuses to compile the
+        // handler. Nothing in this repository can fix that. Remove these pragmas once
+        // Quickshell exposes ExitStatus in its qmltypes.
         onExited: code => {
             if (code !== 0 && root.status === "resolving")
                 root._fail("résolution du hostname échouée (code " + code + ")");
         }
+        // qmllint enable signal-handler-parameters
     }
 
     // 1er étage : nix build du toplevel (sans activation).
@@ -90,10 +96,12 @@ QtObject {
             onStreamFinished: if (text.trim())
                 root._stderr = text.trim()
         }
+        // qmllint disable signal-handler-parameters
         onExited: code => {
             if (code !== 0 && root.status === "building")
                 root._fail(root._buildError());
         }
+        // qmllint enable signal-handler-parameters
     }
 
     function _buildError() {
@@ -129,10 +137,12 @@ QtObject {
             onStreamFinished: if (text.trim())
                 root._stderr = text.trim()
         }
+        // qmllint disable signal-handler-parameters
         onExited: code => {
             if (code !== 0 && root.status === "diffing")
                 root._fail("nvd diff échoué (code " + code + ")");
         }
+        // qmllint enable signal-handler-parameters
     }
 
     function _onDiff(text) {

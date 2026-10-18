@@ -186,10 +186,15 @@ QtObject {
             onStreamFinished: if (text.trim())
                 console.warn("noosphere nix:", text.trim())
         }
+        // qmllint disable signal-handler-parameters
+        // `exited(int, QProcess::ExitStatus)`: the second parameter is a C++ enum Quickshell
+        // does not register for QML, so qmllint cannot resolve it. Remove once upstream
+        // exposes ExitStatus in its qmltypes.
         onExited: code => {
             if (code !== 0 && root._busy)
                 root._fail("flake illisible (nix " + code + ")");
         }
+        // qmllint enable signal-handler-parameters
     }
 
     function _onMeta(text) {
