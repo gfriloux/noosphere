@@ -8,6 +8,7 @@
 // status to error and keeps the last known diff.
 import QtQuick
 import Quickshell.Io
+import qs.Common
 import "../query/queries.js" as Queries
 import "../model/closure.js" as Model
 
@@ -16,7 +17,7 @@ QtObject {
 
     // --- Config, injected by the widget ---
     property string flakePath: ""
-    property string host: "" // clé de nixosConfigurations ; vide → résolu via `hostname`
+    property string host: "" // nixosConfigurations key; empty → resolved through `hostname`
     // Inputs that are behind, to point at their upstream (--override-input): a list of
     // { name, ref }. Empty → build the lock as it stands. Non-empty → an update preview,
     // without writing the lock.
@@ -25,7 +26,7 @@ QtObject {
     // --- Output ---
     // idle | resolving | building | diffing | ready | error
     property string status: "idle"
-    property var diff: null // modèle parseNvdDiff (ou null tant qu'aucun aperçu)
+    property var diff: null // parseNvdDiff model (null until a preview has run)
     property string errorMessage: ""
 
     readonly property bool configured: flakePath.length > 0
@@ -33,8 +34,8 @@ QtObject {
 
     // --- Internal ---
     property string _host: ""
-    property string _target: "" // store path du toplevel buildé
-    property string _stderr: "" // dernière sortie d'erreur (best-effort)
+    property string _target: "" // store path of the built toplevel
+    property string _stderr: "" // the last error output (best-effort)
 
     // Triggers a fresh preview (build + diff). The view's only entry point.
     function preview() {
@@ -72,7 +73,7 @@ QtObject {
                 if (root._host.length > 0)
                     root._build();
                 else
-                    root._fail("hostname introuvable");
+                    root._fail(I18n.trFor("noosphere", "hostname not found"));
             }
         }
         // qmllint disable signal-handler-parameters
@@ -83,7 +84,7 @@ QtObject {
         // ExitStatus in its qmltypes.
         onExited: code => {
             if (code !== 0 && root.status === "resolving")
-                root._fail("résolution du hostname échouée (code " + code + ")");
+                root._fail(I18n.trFor("noosphere", "hostname resolution failed (code %1)").arg(code));
         }
         // qmllint enable signal-handler-parameters
     }
@@ -113,12 +114,12 @@ QtObject {
             var lines = s.split("\n");
             return lines[lines.length - 1].trim();
         }
-        return "build du toplevel échoué (vérifier le flake et le hostname)";
+        return I18n.trFor("noosphere", "toplevel build failed (check the flake and the hostname)");
     }
 
     function _onBuilt(text) {
         if (!text || !text.trim())
-            return; // échec → onExited
+            return; // failure → onExited
         // --print-out-paths can print several lines; the toplevel is the last one.
         var lines = text.trim().split("\n");
         root._target = lines[lines.length - 1].trim();
@@ -142,14 +143,14 @@ QtObject {
         // qmllint disable signal-handler-parameters
         onExited: code => {
             if (code !== 0 && root.status === "diffing")
-                root._fail("nvd diff échoué (code " + code + ")");
+                root._fail(I18n.trFor("noosphere", "nvd diff failed (code %1)").arg(code));
         }
         // qmllint enable signal-handler-parameters
     }
 
     function _onDiff(text) {
         if (!text || !text.trim()) {
-            root._fail("nvd n'a produit aucune sortie");
+            root._fail(I18n.trFor("noosphere", "nvd produced no output"));
             return;
         }
         root.diff = Model.parseNvdDiff(text);

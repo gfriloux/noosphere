@@ -34,27 +34,31 @@ PopoutComponent {
 
     // ---- Sentence composition ----
     //
-    // The model layer returns state, never prose, so the wording lives here. Task 4 of the
-    // English/i18n pass wraps each of these literals in I18n.trFor; keeping composition and
-    // translation as two steps is what makes each reviewable on its own.
+    // The model layer returns state, never prose, so the wording lives here. English is the
+    // source: each literal below is also its own translation id, looked up in the table DMS
+    // loads from translations/<locale>.json. A sentence assembled from parts is wrapped
+    // WHOLE, with %1 placeholders, never as fragments — fragments cannot be reordered, and
+    // French frequently needs that.
 
     function ageText(tsSeconds) {
         var a = Format.relativeAgeParts(tsSeconds, cockpit.now);
         if (a.unit === "now")
-            return "à l'instant";
+            return I18n.trFor("noosphere", "just now");
         if (a.unit === "minutes")
-            return "il y a " + a.value + " min";
+            return I18n.trFor("noosphere", "%1 min ago").arg(a.value);
         if (a.unit === "hours")
-            return "il y a " + a.value + " h";
-        return "il y a " + a.value + " j";
+            return I18n.trFor("noosphere", "%1 h ago").arg(a.value);
+        return I18n.trFor("noosphere", "%1 d ago").arg(a.value);
     }
 
     function behindText(behind) {
         if (typeof behind !== "number")
             return "—";
         if (behind <= 0)
-            return "à jour";
-        return behind + (behind > 1 ? " commits en retard" : " commit en retard");
+            return I18n.trFor("noosphere", "up to date");
+        if (behind === 1)
+            return I18n.trFor("noosphere", "%1 commit behind").arg(behind);
+        return I18n.trFor("noosphere", "%1 commits behind").arg(behind);
     }
 
     // The cause the service published, as a sentence. Every branch must be covered: an
@@ -62,33 +66,33 @@ PopoutComponent {
     function causeText(cause, status) {
         switch (cause) {
         case "nothing-verified":
-            return "aucun input n'a pu être vérifié";
+            return I18n.trFor("noosphere", "no input could be verified");
         case "timeout":
-            return "délai dépassé";
+            return I18n.trFor("noosphere", "timed out");
         case "offline":
-            return "réseau injoignable";
+            return I18n.trFor("noosphere", "network unreachable");
         case "token-refused":
-            return "token GitHub refusé";
+            return I18n.trFor("noosphere", "GitHub token refused");
         case "rate-limited":
-            return "limite d'API GitHub atteinte";
+            return I18n.trFor("noosphere", "GitHub API rate limit reached");
         case "forbidden":
-            return "accès refusé par GitHub";
+            return I18n.trFor("noosphere", "access denied by GitHub");
         case "not-found":
-            return "dépôt introuvable";
+            return I18n.trFor("noosphere", "repository not found");
         case "unavailable":
-            return "GitHub indisponible (" + status + ")";
+            return I18n.trFor("noosphere", "GitHub unavailable (%1)").arg(status);
         case "unexpected":
-            return "réponse inattendue de GitHub (" + status + ")";
+            return I18n.trFor("noosphere", "unexpected response from GitHub (%1)").arg(status);
         case "metadata-unreadable":
-            return "métadonnées du flake illisibles";
+            return I18n.trFor("noosphere", "flake metadata unreadable");
         case "flake-unreadable":
-            return "flake illisible (nix " + status + ")";
+            return I18n.trFor("noosphere", "flake unreadable (nix %1)").arg(status);
         case "watchdog-timeout":
-            return "check interrompu (délai dépassé)";
+            return I18n.trFor("noosphere", "check interrupted (timed out)");
         case "out-of-queue":
-            return "réponse hors file";
+            return I18n.trFor("noosphere", "out-of-queue response");
         default:
-            return "échec du check";
+            return I18n.trFor("noosphere", "check failed");
         }
     }
 
@@ -232,7 +236,7 @@ PopoutComponent {
                             }
                             StyledText {
                                 anchors.verticalCenter: parent.verticalCenter
-                                text: cockpit.service && cockpit.service.generation > 0 ? ("génération n°" + cockpit.service.generation + " · activée " + cockpit.ageText(cockpit.service.generationActivatedAt)) : "génération courante inconnue"
+                                text: cockpit.service && cockpit.service.generation > 0 ? I18n.trFor("noosphere", "generation #%1 · activated %2").arg(cockpit.service.generation).arg(cockpit.ageText(cockpit.service.generationActivatedAt)) : I18n.trFor("noosphere", "current generation unknown")
                                 font.pixelSize: Theme.fontSizeSmall
                                 color: "#a6adc8"
                             }
@@ -241,7 +245,7 @@ PopoutComponent {
                         StyledText {
                             anchors.right: parent.right
                             anchors.verticalCenter: parent.verticalCenter
-                            text: cockpit.service && cockpit.service.lastCheck > 0 ? ("check amont · " + cockpit.ageText(cockpit.service.lastCheck)) : "check amont · en attente…"
+                            text: cockpit.service && cockpit.service.lastCheck > 0 ? I18n.trFor("noosphere", "upstream check · %1").arg(cockpit.ageText(cockpit.service.lastCheck)) : I18n.trFor("noosphere", "upstream check · pending…")
                             font.pixelSize: Theme.fontSizeSmall
                             color: "#6c7086"
                         }
@@ -294,7 +298,7 @@ PopoutComponent {
                             }
                             StyledText {
                                 anchors.verticalCenter: parent.verticalCenter
-                                text: "INPUTS"
+                                text: I18n.trFor("noosphere", "INPUTS")
                                 font.family: Theme.defaultMonoFontFamily
                                 font.pixelSize: Theme.fontSizeSmall
                                 font.weight: Font.DemiBold
@@ -306,7 +310,7 @@ PopoutComponent {
                         StyledText {
                             anchors.right: parent.right
                             anchors.verticalCenter: parent.verticalCenter
-                            text: cockpit.service ? (cockpit.service.behindCount + " en retard · " + cockpit.service.upToDateCount + " à jour") : ""
+                            text: cockpit.service ? I18n.trFor("noosphere", "%1 behind · %2 up to date").arg(cockpit.service.behindCount).arg(cockpit.service.upToDateCount) : ""
                             font.family: Theme.defaultMonoFontFamily
                             font.pixelSize: Theme.fontSizeSmall
                             color: "#f9e2af"
@@ -317,7 +321,7 @@ PopoutComponent {
                     StyledText {
                         width: parent.width
                         visible: cockpit.isError
-                        text: (cockpit.service ? cockpit.causeText(cockpit.service.errorCause, cockpit.service.errorStatus) : "échec du check") + " · réessayer"
+                        text: I18n.trFor("noosphere", "%1 · retry").arg(cockpit.service ? cockpit.causeText(cockpit.service.errorCause, cockpit.service.errorStatus) : cockpit.causeText("", 0))
                         font.pixelSize: Theme.fontSizeSmall
                         color: "#f38ba8"
                     }
@@ -401,7 +405,7 @@ PopoutComponent {
                                 StyledText {
                                     Layout.fillWidth: true
                                     elide: Text.ElideRight
-                                    text: "lock " + cockpit.ageText(row.modelData.lockedAt)
+                                    text: I18n.trFor("noosphere", "lock %1").arg(cockpit.ageText(row.modelData.lockedAt))
                                     font.pixelSize: Theme.fontSizeSmall
                                     color: "#6c7086"
                                 }
@@ -427,7 +431,7 @@ PopoutComponent {
                                     StyledText {
                                         id: clText
                                         anchors.centerIn: parent
-                                        text: "changelog"
+                                        text: I18n.trFor("noosphere", "changelog")
                                         font.pixelSize: Theme.fontSizeSmall
                                         color: "#89b4fa"
                                     }
@@ -483,7 +487,7 @@ PopoutComponent {
                         anchors.verticalCenter: parent.verticalCenter
                         text: {
                             var ms = cockpit.service ? cockpit.service.intervalMs : 3600000;
-                            return "cadence " + (ms >= 3600000 ? (Math.round(ms / 3600000) + " h") : (Math.round(ms / 60000) + " min"));
+                            return ms >= 3600000 ? I18n.trFor("noosphere", "every %1 h").arg(Math.round(ms / 3600000)) : I18n.trFor("noosphere", "every %1 min").arg(Math.round(ms / 60000));
                         }
                         font.family: Theme.defaultMonoFontFamily
                         font.pixelSize: Theme.fontSizeSmall
@@ -520,7 +524,7 @@ PopoutComponent {
                         }
                         StyledText {
                             anchors.verticalCenter: parent.verticalCenter
-                            text: "check maintenant"
+                            text: I18n.trFor("noosphere", "check now")
                             font.pixelSize: Theme.fontSizeSmall
                             font.weight: Font.DemiBold
                             color: "#1e1e2e"

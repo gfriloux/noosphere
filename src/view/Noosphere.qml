@@ -26,32 +26,32 @@ QtObject {
     id: root
 
     // --- Config, injected by the widget from pluginData ---
-    property string flakePath: "" // chemin du flake local (ex. /etc/nixos)
-    property string githubToken: "" // optionnel : lève la limite 60 req/h
-    property string apiBase: "" // vide = api.github.com ; surchargé pour le mock dev
-    property int intervalMs: 3600000 // cadence par défaut : 1 h
+    property string flakePath: "" // path of the local flake (e.g. /etc/nixos)
+    property string githubToken: "" // optional: lifts the 60 req/h limit
+    property string apiBase: "" // empty = api.github.com; overridden for the dev mock
+    property int intervalMs: 3600000 // default poll interval: 1 h
 
     // --- Output: the domain model ---
-    property var inputs: [] // inputs annotés du retard (behind)
+    property var inputs: [] // the inputs, annotated with how far behind they are
     property int behindCount: 0
     property int upToDateCount: 0
-    property string barState: "uptodate" // uptodate | drift (| rebuilding, cap futur)
+    property string barState: "uptodate" // uptodate | drift (| rebuilding, a future cap)
     // idle | polling | live | error
     property string connectionStatus: "idle"
     // A cause CODE, not a sentence — the cockpit turns it into words. `errorStatus` carries
     // the HTTP status or the `nix` exit code when the cause names one.
     property string errorCause: ""
     property int errorStatus: 0
-    property double lastCheck: 0 // unix secondes
-    property int generation: 0 // n° de génération système courante (0 = inconnu)
-    property double generationActivatedAt: 0 // unix secondes (mtime du profil)
+    property double lastCheck: 0 // unix seconds
+    property int generation: 0 // current system generation number (0 = unknown)
+    property double generationActivatedAt: 0 // unix seconds (the profile's mtime)
 
     readonly property bool configured: flakePath.length > 0
 
     // --- État ---
-    property var _st: null // état du driver (src/model/poll.js)
+    property var _st: null // the driver's state (src/model/poll.js)
     property bool _busy: false
-    property var _pending: null // requête HTTP en vol (une seule à la fois) : { xhr, timedOut, settled }
+    property var _pending: null // the in-flight HTTP request (only ever one): { xhr, timedOut, settled }
 
     // Transport factory. The one substitution point left in this file: production returns
     // a real `XMLHttpRequest`, a test can return a fake.
@@ -186,7 +186,7 @@ QtObject {
     // `onDone(status, text, timedOut)` is called exactly once. `timedOut` separates our own
     // abandonment from a network failure: both yield `status === 0`.
     function _ghGet(url, onDone) {
-        root._abortPending(); // invariant : une seule requête vivante à la fois
+        root._abortPending(); // invariant: only one live request at a time
         var xhr = root.xhrFactory();
         var state = {
             xhr: xhr,
@@ -299,7 +299,7 @@ QtObject {
         interval: root.intervalMs
         running: root.configured
         repeat: true
-        triggeredOnStart: true // premier check immédiat
+        triggeredOnStart: true // the first check runs immediately
         onTriggered: root.poll()
     }
 

@@ -66,7 +66,7 @@ Rectangle {
                 }
                 StyledText {
                     anchors.verticalCenter: parent.verticalCenter
-                    text: "DIFF DE CLOSURE"
+                    text: I18n.trFor("noosphere", "CLOSURE DIFF")
                     font.family: Theme.defaultMonoFontFamily
                     font.pixelSize: Theme.fontSizeSmall
                     font.weight: Font.DemiBold
@@ -83,13 +83,13 @@ Rectangle {
                 text: {
                     switch (card.status) {
                     case "resolving":
-                        return "résolution de l'hôte…";
+                        return I18n.trFor("noosphere", "resolving host…");
                     case "building":
-                        return "build…";
+                        return I18n.trFor("noosphere", "building…");
                     case "diffing":
-                        return "diff…";
+                        return I18n.trFor("noosphere", "diffing…");
                     case "error":
-                        return "échec";
+                        return I18n.trFor("noosphere", "failed");
                     default:
                         return "";
                     }
@@ -111,7 +111,7 @@ Rectangle {
         StyledText {
             visible: card.status === "idle" && col.updateCount === 0
             width: parent.width
-            text: col.unpreviewable ? (card.behindCount === 1 ? "1 input en retard — amont non résolu, rien à prévisualiser" : card.behindCount + " inputs en retard — amont non résolu, rien à prévisualiser") : "aucun input en retard — rien à prévisualiser"
+            text: col.unpreviewable ? (card.behindCount === 1 ? I18n.trFor("noosphere", "%1 input behind — upstream unresolved, nothing to preview").arg(card.behindCount) : I18n.trFor("noosphere", "%1 inputs behind — upstream unresolved, nothing to preview").arg(card.behindCount)) : I18n.trFor("noosphere", "no input behind — nothing to preview")
             wrapMode: Text.WordWrap
             font.pixelSize: Theme.fontSizeSmall
             color: col.unpreviewable ? "#f9e2af" : "#6c7086"
@@ -139,7 +139,7 @@ Rectangle {
                 }
                 StyledText {
                     anchors.verticalCenter: parent.verticalCenter
-                    text: "prévisualiser la mise à jour (" + col.updateCount + ")"
+                    text: I18n.trFor("noosphere", "preview the update (%1)").arg(col.updateCount)
                     font.pixelSize: Theme.fontSizeSmall
                     font.weight: Font.DemiBold
                     color: "#89b4fa"
@@ -176,7 +176,7 @@ Rectangle {
             }
             StyledText {
                 anchors.verticalCenter: parent.verticalCenter
-                text: card.status === "building" ? "build de la config mise à jour (sans activation)…" : (card.status === "diffing" ? "calcul du diff de closure…" : "résolution de l'hôte…")
+                text: card.status === "building" ? I18n.trFor("noosphere", "building the updated config (without activating)…") : (card.status === "diffing" ? I18n.trFor("noosphere", "computing the closure diff…") : I18n.trFor("noosphere", "resolving host…"))
                 font.pixelSize: Theme.fontSizeSmall
                 color: "#a6adc8"
             }
@@ -214,7 +214,7 @@ Rectangle {
                 }
                 StyledText {
                     anchors.verticalCenter: parent.verticalCenter
-                    text: "réessayer"
+                    text: I18n.trFor("noosphere", "retry")
                     font.pixelSize: Theme.fontSizeSmall
                     color: "#f38ba8"
                 }
@@ -235,19 +235,19 @@ Rectangle {
             spacing: 6
 
             StyledText {
-                text: (card.diff ? card.diff.updated : 0) + " màj"
+                text: I18n.trFor("noosphere", "%1 updated").arg(card.diff ? card.diff.updated : 0)
                 font.family: Theme.defaultMonoFontFamily
                 font.pixelSize: Theme.fontSizeSmall
                 color: "#f9e2af"
             }
             StyledText {
-                text: "· " + (card.diff ? card.diff.added : 0) + " ajoutés"
+                text: "· " + I18n.trFor("noosphere", "%1 added").arg(card.diff ? card.diff.added : 0)
                 font.family: Theme.defaultMonoFontFamily
                 font.pixelSize: Theme.fontSizeSmall
                 color: "#a6e3a1"
             }
             StyledText {
-                text: "· " + (card.diff ? card.diff.removed : 0) + " retirés"
+                text: "· " + I18n.trFor("noosphere", "%1 removed").arg(card.diff ? card.diff.removed : 0)
                 font.family: Theme.defaultMonoFontFamily
                 font.pixelSize: Theme.fontSizeSmall
                 color: "#f38ba8"
@@ -314,14 +314,14 @@ Rectangle {
                         }
                         StyledText {
                             visible: row.modelData.kind === "added"
-                            text: "ajouté"
+                            text: I18n.trFor("noosphere", "added")
                             font.family: Theme.defaultMonoFontFamily
                             font.pixelSize: Theme.fontSizeSmall
                             color: "#a6e3a1"
                         }
                         StyledText {
                             visible: row.modelData.kind === "removed"
-                            text: "retiré"
+                            text: I18n.trFor("noosphere", "removed")
                             font.family: Theme.defaultMonoFontFamily
                             font.pixelSize: Theme.fontSizeSmall
                             color: "#f38ba8"
@@ -341,7 +341,7 @@ Rectangle {
                         StyledText {
                             id: rebootText
                             anchors.centerIn: parent
-                            text: "REBOOT"
+                            text: I18n.trFor("noosphere", "REBOOT")
                             font.family: Theme.defaultMonoFontFamily
                             font.pixelSize: 9
                             font.weight: Font.DemiBold
@@ -376,7 +376,7 @@ Rectangle {
                 }
                 StyledText {
                     anchors.verticalCenter: parent.verticalCenter
-                    text: "recalculer"
+                    text: I18n.trFor("noosphere", "recompute")
                     font.pixelSize: Theme.fontSizeSmall
                     color: "#89b4fa"
                 }
