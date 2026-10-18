@@ -1,11 +1,11 @@
-// Cockpit noosphere — contenu du popout (lecture seule).
-// Deux cartes empilées : EN-TÊTE (identité du flake + branche + génération + dernier check)
-// et INPUTS (liste des inputs directs, retard sur l'amont, lien changelog au survol). Pied :
-// cadence + « check maintenant » (re-check, lecture seule). Les mutations (update, rebuild,
-// rollback) et les cartes diff de closure / rebuild sont reportées (cf. DESIGN.md).
+// noosphere's cockpit — the popout's content (read-only).
+// Stacked cards: a header (flake identity + branch + generation + last check) and INPUTS
+// (the direct inputs, their lag against upstream, a changelog link on hover). Footer: the
+// poll interval + a manual re-check, read-only. Mutations (update, rebuild, rollback) and
+// the rebuild card are deferred (see DESIGN.md).
 //
-// Découplé de NoosphereWidget : reçoit le service (`service`) et le composant racine
-// (`owner`). Ne construit ni n'exécute jamais de commande.
+// Decoupled from NoosphereWidget: it receives the service (`service`) and the root
+// component (`owner`). It never builds or runs a command.
 //
 // `ComponentBehavior: Bound`: the Repeater's delegate already declares
 // `required property var modelData`, so the pragma changes nothing for it — it only makes
@@ -26,13 +26,13 @@ PopoutComponent {
     property var closureService
     property var owner
 
-    // En-tête par défaut de PopoutComponent masqué : on porte nos propres cartes.
+    // PopoutComponent's default header is hidden: we carry our own cards.
     headerText: ""
 
     readonly property bool isError: service && service.connectionStatus === "error"
     readonly property var inputs: service ? service.inputs : []
 
-    // Horloge grossière pour rafraîchir les « il y a N … » (les âges bougent lentement).
+    // A coarse clock to refresh the relative ages; they move slowly.
     property double now: Date.now() / 1000
     Timer {
         interval: 30000
@@ -41,9 +41,9 @@ PopoutComponent {
         onTriggered: cockpit.now = Date.now() / 1000
     }
 
-    // Enveloppe : le contenu du PopoutComponent est empilé dans une Column par DMS, qui
-    // interdit les anchors sur ses enfants directs. On place donc un seul Item (width +
-    // height, sans anchors) ; à l'intérieur, notre Column peut s'ancrer librement.
+    // Wrapper: DMS stacks a PopoutComponent's content in a Column, which forbids anchors on
+    // its direct children. So we place a single Item (width + height, no anchors); inside
+    // it, our own Column can anchor freely.
     Item {
         width: parent.width
         height: outer.implicitHeight + 28
@@ -58,7 +58,7 @@ PopoutComponent {
             anchors.topMargin: 14
             spacing: 11
 
-            // ============ Carte EN-TÊTE ============
+            // ============ Header card ============
             Rectangle {
                 width: parent.width
                 radius: 13
@@ -85,7 +85,7 @@ PopoutComponent {
                     anchors.bottomMargin: 14
                     spacing: 9
 
-                    // Ligne 1 : glyphe + identité, chip branche à droite.
+                    // Row 1: glyph + identity, branch chip on the right.
                     Item {
                         width: parent.width
                         height: 34
@@ -120,7 +120,7 @@ PopoutComponent {
                             }
                         }
 
-                        // Chip branche.
+                        // Branch chip.
                         Rectangle {
                             anchors.right: parent.right
                             anchors.verticalCenter: parent.verticalCenter
@@ -153,7 +153,7 @@ PopoutComponent {
                         }
                     }
 
-                    // Ligne 2 : génération à gauche, dernier check à droite.
+                    // Row 2: generation on the left, last check on the right.
                     Item {
                         width: parent.width
                         height: 16
@@ -189,7 +189,7 @@ PopoutComponent {
                 }
             }
 
-            // ============ Carte INPUTS ============
+            // ============ INPUTS card ============
             Rectangle {
                 width: parent.width
                 radius: 13
@@ -216,7 +216,7 @@ PopoutComponent {
                     anchors.bottomMargin: 14
                     spacing: 3
 
-                    // En-tête de carte.
+                    // Card header.
                     Item {
                         width: parent.width
                         height: 20
@@ -253,7 +253,7 @@ PopoutComponent {
                         }
                     }
 
-                    // Ligne de statut d'erreur (best-effort : la liste dessous reste le dernier connu).
+                    // Error status row; best-effort, the list below stays the last known state.
                     StyledText {
                         width: parent.width
                         visible: cockpit.isError
@@ -262,7 +262,7 @@ PopoutComponent {
                         color: "#f38ba8"
                     }
 
-                    // Liste des inputs directs.
+                    // The direct inputs.
                     Repeater {
                         model: cockpit.inputs
 
@@ -318,7 +318,7 @@ PopoutComponent {
                                     font.weight: Font.DemiBold
                                     color: "#cdd6f4"
                                 }
-                                // Chip de canal (ex. nixos-unstable), masqué si absent.
+                                // Channel chip (e.g. nixos-unstable), hidden when absent.
                                 Rectangle {
                                     visible: row.modelData.channel.length > 0
                                     Layout.alignment: Qt.AlignVCenter
@@ -336,8 +336,8 @@ PopoutComponent {
                                         color: "#6c7086"
                                     }
                                 }
-                                // Âge de lock élastique + élidable : absorbe le manque de place
-                                // (noms longs, gros compteurs) et pousse le retard à droite.
+                                // Elastic, elidable lock age: it absorbs the missing room — long
+                                // names, large counters — and pushes the lag to the right.
                                 StyledText {
                                     Layout.fillWidth: true
                                     elide: Text.ElideRight
@@ -346,7 +346,7 @@ PopoutComponent {
                                     color: "#6c7086"
                                 }
 
-                                // Lien changelog (lecture seule) : révélé au survol d'une ligne en retard.
+                                // Changelog link (read-only), revealed on hover of a row that is behind.
                                 Rectangle {
                                     visible: row.behindPositive && row.changelogUrl.length > 0
                                     opacity: rowHover.hovered ? 1 : 0
@@ -380,7 +380,7 @@ PopoutComponent {
                                     }
                                 }
 
-                                // Texte de retard, une seule ligne (largeur contenu), à droite.
+                                // Lag text, a single line sized to its content, on the right.
                                 StyledText {
                                     Layout.alignment: Qt.AlignVCenter
                                     wrapMode: Text.NoWrap
@@ -396,14 +396,14 @@ PopoutComponent {
                 }
             }
 
-            // ============ Carte DIFF DE CLOSURE ============
+            // ============ Closure diff card ============
             ClosureCard {
                 width: parent.width
                 service: cockpit.closureService
                 behindCount: cockpit.service ? cockpit.service.behindCount : 0
             }
 
-            // ============ Pied : cadence + check maintenant (lecture seule) ============
+            // ============ Footer: poll interval + manual re-check (read-only) ============
             Item {
                 width: parent.width
                 height: 36

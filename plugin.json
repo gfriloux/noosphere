@@ -1,7 +1,7 @@
 {
   "id": "noosphere",
   "name": "Noosphere",
-  "description": "Suivi de dérive de flake NixOS — badge d'état et cockpit des inputs en retard",
+  "description": "NixOS flake drift tracker — a status badge and a cockpit of the inputs that are behind",
   "version": "0.4.0",
   "author": "gfriloux",
   "type": "widget",

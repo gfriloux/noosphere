@@ -1,9 +1,9 @@
-// Glyphe identité de noosphere : une rosace/engrenage (roue à 8 rayons + moyeu), clin
-// d'œil mécanique de l'Adeptus Mechanicus (cf. DESIGN.md). Dessiné en Canvas pour rester
-// net à toute taille et se colorer selon l'état du badge (bleu/jaune/mauve/gris).
+// noosphere's identity glyph: a rosette/gear (an 8-spoke wheel + hub), the discreet
+// Adeptus Mechanicus nod (see DESIGN.md). Drawn on a Canvas so it stays crisp at any size
+// and takes the badge's state colour (blue/yellow/mauve/grey).
 //
-// Composition (viewBox 24×24, centre 12,12) : quatre barres diamétrales rotées de 45° =
-// 8 rayons ; par-dessus un disque plein r=7.4 ; puis un moyeu sombre r=2.9.
+// Composition (24×24 viewBox, centre 12,12): four diametral bars rotated by 45° = 8 spokes;
+// a filled disc r=7.4 over them; then a dark hub r=2.9.
 import QtQuick
 
 Item {
@@ -40,7 +40,7 @@ Item {
             ctx.translate(12, 12);
 
             ctx.fillStyle = glyph.color;
-            // 4 barres diamétrales → 8 rayons.
+            // 4 diametral bars → 8 spokes.
             for (var i = 0; i < 4; i++) {
                 ctx.save();
                 ctx.rotate(i * Math.PI / 4);
@@ -48,11 +48,11 @@ Item {
                 ctx.fill();
                 ctx.restore();
             }
-            // Disque plein central.
+            // Central filled disc.
             ctx.beginPath();
             ctx.arc(0, 0, 7.4, 0, 2 * Math.PI);
             ctx.fill();
-            // Moyeu sombre.
+            // Dark hub.
             ctx.beginPath();
             ctx.fillStyle = "rgba(0,0,0,0.42)";
             ctx.arc(0, 0, 2.9, 0, 2 * Math.PI);

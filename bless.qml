@@ -1,11 +1,11 @@
-// Régénère les goldens depuis les fixtures via le transform courant de chaque cas.
-// Exécuté par `just bless`. Les transforms sont en QML-JS (.pragma library) : seul un
-// runtime QML peut les exécuter — quickshell pour la capacité d'écriture fichier.
+// Regenerates the goldens from the fixtures through each case's current transform.
+// Run by `just bless`. The transforms are QML-JS (.pragma library), so only a QML runtime
+// can execute them — quickshell, for its file-writing capability.
 //
-// Vit à la racine du repo : quickshell enracine la config sur le dossier du -p, et les
+// It lives at the repository root: quickshell roots the config on the -p directory, and the
 // imports ne doivent pas en sortir. Racine = repo → `src/` et `tests/` sont tous deux
-// accessibles (cases.js importe `../src/model/...`). Lecture relative à ce fichier,
-// écriture relative au cwd (= racine du repo, `just` s'y place).
+// reachable (cases.js imports `../src/model/...`). Reads are relative to this file, writes
+// relative to the cwd — the repository root, where `just` places itself.
 import QtQuick
 import Quickshell
 import Quickshell.Io
@@ -29,7 +29,7 @@ ShellRoot {
         }
     }
 
-    // Laisse les écritures se vider avant de quitter.
+    // Let the writes flush before quitting.
     Timer {
         running: true
         interval: 300

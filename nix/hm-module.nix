@@ -2,7 +2,7 @@
 #
 # Assemble le plugin (plugin.json + src/) dans le store et le lie dans le dossier de
 # plugins de DMS. L'activation se fait ensuite dans DMS (Settings → Plugins → Noosphere),
-# puis les réglages (chemin du flake, owner/repo, branche, token GitHub optionnel,
+# then the settings (flake path, owner/repo, branch, optional GitHub token,
 # intervalle) dans ce panneau.
 {
   config,
@@ -19,15 +19,15 @@
   '';
 in {
   options.programs.noosphere.enable =
-    lib.mkEnableOption "noosphere — widget de suivi de dérive de flake pour DankMaterialShell";
+    lib.mkEnableOption "noosphere — a flake drift tracker widget for DankMaterialShell";
 
   config = lib.mkIf cfg.enable {
-    # Le plugin est découvert par DMS dans ~/.config/DankMaterialShell/plugins/.
+    # DMS discovers the plugin in ~/.config/DankMaterialShell/plugins/.
     xdg.configFile."DankMaterialShell/plugins/Noosphere".source = plugin;
 
     # Deps runtime : nix (lit le flake local via `nix flake metadata` et build le toplevel
-    # à la demande), nvd (diff de closure) et xdg-open (liens changelog, fourni par
-    # xdg-utils). L'amont GitHub est interrogé par le service lui-même : aucun client HTTP
+    # on demand), nvd (the closure diff) and xdg-open (changelog links, provided by
+    # xdg-utils). GitHub upstream is queried by the service itself: no HTTP client
     # externe n'est requis.
     home.packages = [pkgs.nix pkgs.nvd pkgs.xdg-utils];
   };

@@ -1,6 +1,7 @@
-// Carte DIFF DE CLOSURE (v0.2.0). Pilotée par le service Closure (`service`) : bouton de
-// prévisualisation (idle), spinner (build/diff), résumé + console des changements (ready),
-// message d'erreur (error). Lecture seule : le bouton build sans activer (cf. DESIGN.md).
+// The closure-diff card (v0.2.0). Driven by the Closure service (`service`): a preview
+// button (idle), a spinner (build/diff), a summary plus a console of the changes (ready),
+// an error message (error). Read-only: the button builds without activating (see
+// DESIGN.md).
 import QtQuick
 import qs.Common
 import qs.Widgets
@@ -10,9 +11,9 @@ Rectangle {
     id: card
 
     property var service
-    // Inputs en retard vus par le service de dérive. Sert à distinguer « rien à faire » de
-    // « il y a du retard, mais on ne sait pas le prévisualiser » : sans cette information la
-    // carte contredirait la liste des inputs affichée juste au-dessus.
+    // The inputs the drift service sees as behind. This is what separates "nothing to do"
+    // from "something is behind but we cannot preview it": without it the card would
+    // contradict the input list shown directly above it.
     property int behindCount: 0
 
     readonly property var diff: service ? service.diff : null
@@ -26,7 +27,7 @@ Rectangle {
     color: "#313244"
     implicitHeight: col.implicitHeight + 28
 
-    // Liseré gauche inséré (épouse les coins arrondis).
+    // Inset left edge, following the rounded corners.
     Rectangle {
         anchors.left: parent.left
         anchors.top: parent.top
@@ -47,7 +48,7 @@ Rectangle {
         anchors.bottomMargin: 14
         spacing: 9
 
-        // En-tête de carte.
+        // Card header.
         Item {
             width: parent.width
             height: 20
@@ -74,7 +75,7 @@ Rectangle {
                 }
             }
 
-            // Statut à droite (build… / diff… / erreur).
+            // Status on the right (building… / diffing… / error).
             StyledText {
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
@@ -99,14 +100,14 @@ Rectangle {
             }
         }
 
-        // Nombre d'inputs en retard à prévisualiser (overrides vers l'amont).
+        // How many inputs behind there are to preview (overrides onto upstream).
         readonly property int updateCount: (card.service && card.service.overrides) ? card.service.overrides.length : 0
-        // Du retard existe mais aucun input n'est prévisualisable : leur amont n'a pas été
-        // résolu (type non-github, dépôt injoignable, réponse GitHub écartée). On le dit,
-        // plutôt que d'annoncer « aucun input en retard » à contre-sens de la liste.
+        // Something is behind but nothing is previewable: no upstream was resolved for any
+        // of them (non-github type, unreachable repository, discarded GitHub response). Say
+        // so, rather than claiming "nothing is behind" against what the list shows.
         readonly property bool unpreviewable: col.updateCount === 0 && card.behindCount > 0
 
-        // --- idle, rien à mettre à jour : note ---
+        // --- idle, nothing to update: a note ---
         StyledText {
             visible: card.status === "idle" && col.updateCount === 0
             width: parent.width
@@ -116,7 +117,7 @@ Rectangle {
             color: col.unpreviewable ? "#f9e2af" : "#6c7086"
         }
 
-        // --- idle : bouton de prévisualisation (build de la config mise à jour, à la demande) ---
+        // --- idle: the preview button (builds the updated configuration, on demand) ---
         Rectangle {
             visible: card.status === "idle" && col.updateCount > 0
             width: parent.width
@@ -154,7 +155,7 @@ Rectangle {
             }
         }
 
-        // --- building / diffing / resolving : spinner + libellé ---
+        // --- building / diffing / resolving: spinner + label ---
         Row {
             visible: card.service && card.service.busy
             spacing: 8
@@ -181,7 +182,7 @@ Rectangle {
             }
         }
 
-        // --- error : message + réessayer ---
+        // --- error: message + retry ---
         StyledText {
             visible: card.isError
             width: parent.width
@@ -228,7 +229,7 @@ Rectangle {
             }
         }
 
-        // --- ready : résumé + console ---
+        // --- ready: summary + console ---
         Row {
             visible: card.status === "ready" && card.diff
             spacing: 6
@@ -260,7 +261,7 @@ Rectangle {
             }
         }
 
-        // Console des changements (scroll si longue).
+        // Console of the changes, scrolling when long.
         Rectangle {
             visible: card.status === "ready" && card.diff && card.diff.entries.length > 0
             width: parent.width
@@ -290,7 +291,7 @@ Rectangle {
                         anchors.verticalCenter: parent.verticalCenter
                         spacing: 6
 
-                        // Marqueur ▲ (reboot) ou espace d'alignement.
+                        // The ▲ reboot marker, or an alignment space.
                         StyledText {
                             width: 10
                             text: row.reboot ? "▲" : ""
@@ -327,7 +328,7 @@ Rectangle {
                         }
                     }
 
-                    // Badge REBOOT à droite.
+                    // REBOOT badge on the right.
                     Rectangle {
                         visible: row.reboot
                         anchors.right: parent.right
@@ -352,7 +353,7 @@ Rectangle {
             }
         }
 
-        // Relancer un aperçu quand un diff est déjà affiché.
+        // Re-run a preview when a diff is already on screen.
         Rectangle {
             visible: card.status === "ready"
             width: rerunRow.implicitWidth + 20

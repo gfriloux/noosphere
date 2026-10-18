@@ -1,6 +1,7 @@
-// Réglages du plugin (PluginSettings de DMS). Déclaratif : chaque *Setting auto-persiste
-// dans pluginData via son settingKey. Le widget (NoosphereWidget) lit flakePath / repoSlug /
-// branch / githubToken / apiBase / checkMinutes et les injecte dans le service Noosphere.
+// The plugin's settings (DMS's PluginSettings). Declarative: each *Setting auto-persists
+// into pluginData through its settingKey. The widget (NoosphereWidget) reads flakePath /
+// repoSlug / branch / githubToken / apiBase / checkMinutes and injects them into the
+// Noosphere service.
 import QtQuick
 import qs.Common
 import qs.Widgets

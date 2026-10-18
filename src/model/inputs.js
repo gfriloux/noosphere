@@ -1,18 +1,18 @@
 .pragma library
 
-// Transforms du modèle de dérive. Fonctions PURES : mêmes entrées (sortie de
-// `nix flake metadata --json` + réponses compare GitHub) → même modèle de domaine
-// (cf. golden tests). Entrée = JSON déjà parsé ; sortie = modèle noosphere.
+// Drift-model transforms. PURE functions: the same inputs (`nix flake metadata --json`
+// output + GitHub compare responses) → the same domain model (see the golden tests).
+// Input = already-parsed JSON; output = noosphere's model.
 
-// Sortie de `nix flake metadata --json` → liste des **inputs directs** du flake (ceux
-// déclarés à la racine : `locks.nodes[root].inputs`), triés par nom pour un rendu
-// déterministe. On ne descend PAS dans le transitif (cf. DESIGN.md : l'input est l'unité).
+// `nix flake metadata --json` output → the flake's **direct inputs** (those declared at the
+// root: `locks.nodes[root].inputs`), sorted by name so the rendering is deterministic. We do
+// NOT descend into transitive nodes (see DESIGN.md: the input is the unit).
 //
-// Chaque input : { name, type, owner, repoName, lockRev, lockedAt, channel }.
-// - github : owner/repoName/lockRev renseignés ; channel = original.ref (ex. nixos-unstable)
-//   ou "" si l'input suit la branche par défaut (résolue plus tard par le service).
-// - autres types (git, path, tarball…) : affichés, jamais comparés → owner/repoName/channel
-//   vides, lockRev best-effort (locked.rev s'il existe).
+// Each input: { name, type, owner, repoName, lockRev, lockedAt, channel }.
+// - github: owner/repoName/lockRev filled in; channel = original.ref (e.g. nixos-unstable)
+//   or "" when the input follows the default branch, resolved later by the service.
+// - other types (git, path, tarball…): displayed, never compared → owner/repoName/channel
+//   empty, lockRev best-effort (locked.rev when present).
 function parseMetadata(meta) {
     var locks = (meta && meta.locks) || {};
     var nodes = locks.nodes || {};
@@ -25,7 +25,7 @@ function parseMetadata(meta) {
     for (var i = 0; i < names.length; i++) {
         var name = names[i];
         var ref = direct[name];
-        // `follows` au niveau racine → valeur en tableau (redirection, pas de lock propre) : ignoré.
+        // A root-level `follows` is an array (a redirection with no lock of its own): skipped.
         if (typeof ref !== "string")
             continue;
         var node = nodes[ref];
@@ -48,50 +48,50 @@ function parseMetadata(meta) {
     return out;
 }
 
-// Réponse compare GitHub → retard (`behind`) de l'input. `ahead_by` = nb de commits dont
-// la branche amont (head) est en avance sur la révision verrouillée (base). null si la
-// réponse ne porte pas d'`ahead_by` (erreur, rate-limit, input non comparable).
+// GitHub compare response → the input's lag (`behind`). `ahead_by` = the number of commits
+// by which the upstream branch (head) is ahead of the locked revision (base). null when the
+// response carries no `ahead_by` (error, rate limit, non-comparable input).
 function parseCompare(res) {
     if (res && typeof res.ahead_by === "number")
         return res.ahead_by;
     return null;
 }
 
-// La réponse compare `res` porte-t-elle bien sur la révision verrouillée `lockRev` ?
-// GitHub renvoie la base de la comparaison dans `base_commit.sha` : c'est le seul moyen de
-// rattacher une réponse à l'input qui l'a demandée. Une réponse tardive (requête abandonnée,
-// étape sautée) ou d'erreur ne matche pas → le service la jette au lieu d'attribuer son
-// retard au voisin (cf. .claude/plans/v0.2.1/plan.md).
+// Is the compare response `res` really about the locked revision `lockRev`?
+// GitHub returns the comparison's base in `base_commit.sha`: that is the only way to attach
+// a response to the input that asked for it. A late response (abandoned request, skipped
+// step) or an error does not match → the driver discards it instead of attributing its lag
+// to the neighbour. See DESIGN.md invariant 10.
 function compareBelongsTo(res, lockRev) {
     if (!lockRev)
         return false;
     return !!(res && res.base_commit && res.base_commit.sha === lockRev);
 }
 
-// Réponse repo GitHub → branche par défaut (résout le head des inputs sans `ref` explicite).
+// GitHub repo response → the default branch, resolving the head of inputs with no explicit `ref`.
 function parseDefaultBranch(res) {
     return (res && res.default_branch) || "";
 }
 
-// Même rattachement que `compareBelongsTo`, pour la réponse `GET /repos/<owner>/<repo>` :
-// `full_name` identifie le dépôt interrogé. Une réponse qui ne désigne pas le dépôt attendu
-// résoudrait le head d'un input sur la branche par défaut d'un autre.
+// The same attribution as `compareBelongsTo`, for the `GET /repos/<owner>/<repo>` response:
+// `full_name` identifies the repository asked about. A response naming a different repository
+// would resolve one input's head to another's default branch.
 function repoBelongsTo(res, owner, repoName) {
     if (!owner || !repoName)
         return false;
     return !!(res && res.full_name === owner + "/" + repoName);
 }
 
-// Statut HTTP d'un appel GitHub → cause nommée, ou `null` si l'appel s'est bien passé.
-// Rendu : { message, fatal }.
+// A GitHub call's HTTP status → a named cause, or `null` when the call went fine.
+// Returns { message, fatal }.
 //
-// `fatal` distingue une cause qui vaut pour **toutes** les requêtes suivantes (jeton
-// refusé, limite de débit : les marteler ne ferait qu'aggraver) d'une cause propre à un
-// seul input (dépôt introuvable, incident serveur), auquel cas le poll continue et cet
-// input reste simplement en retard indéterminé.
+// `fatal` separates a cause that holds for **every** later request (token refused, rate
+// limit: hammering them would only make it worse) from one specific to a single input
+// (repository not found, server incident), where the poll carries on and that input simply
+// stays indeterminately behind.
 //
-// `timedOut` : nous avons abandonné la requête nous-mêmes. Sans ce drapeau la panne réseau
-// et le délai dépassé seraient indiscernables — tous deux rendent `status === 0`.
+// `timedOut`: we abandoned the request ourselves. Without that flag a network failure and a
+// timeout would be indistinguishable — both yield `status === 0`.
 function githubError(status, body, timedOut) {
     if (status >= 200 && status < 300)
         return null;
@@ -113,8 +113,8 @@ function githubError(status, body, timedOut) {
             "fatal": true
         };
     if (status === 403) {
-        // GitHub rend 403 aussi bien pour une limite de débit que pour un accès interdit ;
-        // seul le corps les sépare. Illisible → on s'en tient au cas générique.
+        // GitHub returns 403 both for a rate limit and for forbidden access; only the body
+        // tells them apart. Unreadable → fall back to the generic case.
         var msg = "";
         try {
             msg = (JSON.parse(body) || {}).message || "";
@@ -143,14 +143,14 @@ function githubError(status, body, timedOut) {
     };
 }
 
-// Head à comparer pour un input : sa `channel` (ref suivie) sinon la branche par défaut
-// du repo (fallback résolu par le service).
+// The head to compare an input against: its `channel` (the tracked ref), otherwise the
+// repository's default branch, which the service resolves.
 function upstreamRef(input, fallbackBranch) {
     return input.channel || fallbackBranch || "";
 }
 
-// Annote chaque input de son retard depuis une map { name: behind }. Un name absent de la
-// map → behind null (indéterminé : non-github, non résolu, ou erreur). Conserve l'ordre.
+// Annotates each input with its lag from a { name: behind } map. A name absent from the map
+// → behind null (indeterminate: non-github, unresolved, or an error). Order is preserved.
 function mergeBehind(inputs, behindByName) {
     behindByName = behindByName || {};
     return inputs.map(function (it) {
@@ -168,7 +168,7 @@ function mergeBehind(inputs, behindByName) {
     });
 }
 
-// Nombre d'inputs réellement en retard (behind > 0). Les behind null/0 ne comptent pas.
+// How many inputs are actually behind (behind > 0). null and 0 do not count.
 function behindCount(inputs) {
     var n = 0;
     for (var i = 0; i < inputs.length; i++)
@@ -177,7 +177,7 @@ function behindCount(inputs) {
     return n;
 }
 
-// Nombre d'inputs à jour (behind === 0). Sert au sous-titre « M à jour ».
+// How many inputs are up to date (behind === 0). Feeds the INPUTS card's subtitle.
 function upToDateCount(inputs) {
     var n = 0;
     for (var i = 0; i < inputs.length; i++)
@@ -186,16 +186,16 @@ function upToDateCount(inputs) {
     return n;
 }
 
-// État du badge. rebuilding (cap futur) l'emporte ; sinon drift si un input dérive, sinon
-// uptodate. En v1, rebuilding n'est jamais passé à true (lecture seule).
+// The badge's state. rebuilding (a future cap) wins; otherwise drift when any input is
+// behind, otherwise uptodate. In v1 rebuilding is never passed as true (read-only).
 function barState(inputs, rebuilding) {
     if (rebuilding)
         return "rebuilding";
     return behindCount(inputs) > 0 ? "drift" : "uptodate";
 }
 
-// Cible du symlink de profil système (/nix/var/nix/profiles/system) → numéro de génération.
-// "…/system-142-link" → 142 ; 0 si non reconnu. Lecture seule (readlink), best-effort.
+// The system profile symlink's target (/nix/var/nix/profiles/system) → generation number.
+// "…/system-142-link" → 142; 0 when unrecognised. Read-only (readlink), best-effort.
 function parseGeneration(linkTarget) {
     var m = /system-(\d+)-link\/?$/.exec(linkTarget || "");
     return m ? parseInt(m[1], 10) : 0;

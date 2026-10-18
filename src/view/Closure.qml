@@ -1,11 +1,11 @@
-// Service de diff de closure (v0.2.0) : sur demande explicite, build le toplevel de la
-// config NixOS du flake (SANS activation) puis `nvd diff` contre la génération courante.
-// Lecture seule au sens DESIGN : construit/télécharge des dérivations, n'active jamais.
-// Jamais automatique — aucun timer, uniquement déclenché par la vue via preview().
+// Closure-diff service (v0.2.0): on explicit request, builds the flake's NixOS
+// configuration toplevel (WITHOUT activating it) then runs `nvd diff` against the current
+// generation. Read-only in DESIGN's sense: it builds and downloads derivations, it never
+// activates. Never automatic — no timer, triggered only by the view through preview().
 //
-// Chaîne : (hostname si non configuré) → nix build …#toplevel --print-out-paths → nvd diff
-// /run/current-system <toplevel> → parseNvdDiff. Best-effort : tout échec → status error,
-// dernier diff connu conservé.
+// The chain: (hostname when unconfigured) → nix build …#toplevel --print-out-paths →
+// nvd diff /run/current-system <toplevel> → parseNvdDiff. Best-effort: any failure sets the
+// status to error and keeps the last known diff.
 import QtQuick
 import Quickshell.Io
 import "../query/queries.js" as Queries
@@ -14,14 +14,15 @@ import "../model/closure.js" as Model
 QtObject {
     id: root
 
-    // --- Config (injectée par le widget) ---
+    // --- Config, injected by the widget ---
     property string flakePath: ""
     property string host: "" // clé de nixosConfigurations ; vide → résolu via `hostname`
-    // Inputs en retard à pointer sur leur amont (--override-input) : liste { name, ref }.
-    // Vide → build du lock tel quel. Non vide → aperçu de mise à jour (sans écrire le lock).
+    // Inputs that are behind, to point at their upstream (--override-input): a list of
+    // { name, ref }. Empty → build the lock as it stands. Non-empty → an update preview,
+    // without writing the lock.
     property var overrides: []
 
-    // --- Sortie ---
+    // --- Output ---
     // idle | resolving | building | diffing | ready | error
     property string status: "idle"
     property var diff: null // modèle parseNvdDiff (ou null tant qu'aucun aperçu)
@@ -30,12 +31,12 @@ QtObject {
     readonly property bool configured: flakePath.length > 0
     readonly property bool busy: status === "resolving" || status === "building" || status === "diffing"
 
-    // --- Interne ---
+    // --- Internal ---
     property string _host: ""
     property string _target: "" // store path du toplevel buildé
     property string _stderr: "" // dernière sortie d'erreur (best-effort)
 
-    // Déclenche un aperçu frais (build + diff). Point d'entrée unique de la vue.
+    // Triggers a fresh preview (build + diff). The view's only entry point.
     function preview() {
         if (!root.configured || root.busy)
             return;
@@ -61,7 +62,7 @@ QtObject {
         root.errorMessage = msg;
     }
 
-    // Résolution best-effort de l'hôte courant.
+    // Best-effort resolution of the current host.
     property Process hostProc: Process {
         running: false
         command: Queries.hostnameArgv()
@@ -87,7 +88,7 @@ QtObject {
         // qmllint enable signal-handler-parameters
     }
 
-    // 1er étage : nix build du toplevel (sans activation).
+    // Stage 1: nix build of the toplevel, without activating it.
     property Process buildProc: Process {
         running: false
         stdout: StdioCollector {
@@ -106,7 +107,7 @@ QtObject {
     }
 
     function _buildError() {
-        // Dernière ligne de stderr (souvent la plus parlante), sinon message générique.
+        // The last stderr line, usually the most telling one; otherwise a generic message.
         var s = root._stderr.trim();
         if (s.length > 0) {
             var lines = s.split("\n");
@@ -118,7 +119,7 @@ QtObject {
     function _onBuilt(text) {
         if (!text || !text.trim())
             return; // échec → onExited
-        // --print-out-paths peut imprimer plusieurs lignes ; le toplevel est la dernière.
+        // --print-out-paths can print several lines; the toplevel is the last one.
         var lines = text.trim().split("\n");
         root._target = lines[lines.length - 1].trim();
         if (!root._target)
@@ -128,7 +129,7 @@ QtObject {
         nvdProc.running = true;
     }
 
-    // 2e étage : nvd diff → parse.
+    // Stage 2: nvd diff → parse.
     property Process nvdProc: Process {
         running: false
         stdout: StdioCollector {

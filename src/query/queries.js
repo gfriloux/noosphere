@@ -1,17 +1,17 @@
 .pragma library
 
-// Construction des commandes (argv) et des URLs d'API. Fonctions PURES, testables : elles
-// ne construisent que la commande / l'URL, sans réseau ni authentification.
+// Command (argv) and API URL builders. PURE, testable functions: they build the command or
+// the URL and nothing else — no network, no authentication.
 //
-// L'auth GitHub (optionnelle) vit dans le header HTTP `Authorization: Bearer <token>`,
-// injecté par le service (src/view/Noosphere.qml) : le token n'apparaît JAMAIS ici.
-// Corollaire : aucun secret dans ces builders, donc les fixtures/goldens dérivés sont
-// committables sans risque (cf. DESIGN.md).
+// GitHub auth (optional) lives in the `Authorization: Bearer <token>` HTTP header, injected
+// by the service (src/view/Noosphere.qml): the token NEVER appears here. Corollary: no
+// secret in these builders, so the fixtures and goldens derived from them are committable
+// without risk (see DESIGN.md).
 
-// nix flake metadata --json [<path>] → métadonnées du flake (inputs + locks) en JSON.
-// On retourne un tableau d'arguments — jamais une ligne shell : le chemin (qui peut
-// contenir des espaces) reste UN seul élément, pas de découpage ni d'injection.
-// `path` absent → nix résout le flake du répertoire courant.
+// nix flake metadata --json [<path>] → the flake's metadata (inputs + locks) as JSON.
+// We return an argument array — never a shell line: the path, which may contain spaces,
+// stays ONE element, with no splitting and no injection.
+// No `path` → nix resolves the flake of the current directory.
 function flakeMetadata(path) {
     var args = ["flake", "metadata", "--json"];
     if (path)
@@ -19,44 +19,44 @@ function flakeMetadata(path) {
     return args;
 }
 
-// Base par défaut de l'API GitHub. Surchargeable (`apiBase`) pour pointer un mock local
-// en dev (`just mock`) sans toucher au réseau — cf. scripts/github-mock.py.
+// Default GitHub API base. Overridable (`apiBase`) to point at a local mock during
+// development (`just mock`) with no network at all — see scripts/github-mock.py.
 var GITHUB_API = "https://api.github.com";
 
-// URL de l'API compare GitHub : GET <apiBase>/repos/<owner>/<repo>/compare/<base>...<head>.
-// La réponse porte `ahead_by` = nombre de commits dont `head` (branche amont) est en
-// avance sur `base` (révision verrouillée du lock) = le **retard** de l'input.
+// GitHub compare API URL: GET <apiBase>/repos/<owner>/<repo>/compare/<base>...<head>.
+// The response carries `ahead_by` = the number of commits by which `head` (the upstream
+// branch) is ahead of `base` (the locked revision) = the input's **lag**.
 function compareApiUrl(apiBase, owner, repo, base, head) {
     return (apiBase || GITHUB_API) + "/repos/" + owner + "/" + repo + "/compare/" + base + "..." + head;
 }
 
-// URL de l'API repo GitHub : GET <apiBase>/repos/<owner>/<repo>. Sert à résoudre la branche
-// par défaut (`default_branch`) d'un input qui ne suit pas de `ref` explicite (cf. model).
+// GitHub repo API URL: GET <apiBase>/repos/<owner>/<repo>. Used to resolve the
+// `default_branch` of an input that follows no explicit `ref` (see the model layer).
 function repoApiUrl(apiBase, owner, repo) {
     return (apiBase || GITHUB_API) + "/repos/" + owner + "/" + repo;
 }
 
-// --- Diff de closure (v0.2.0, build à la demande — cf. DESIGN.md) ---
+// --- Closure diff (v0.2.0, built on demand — see DESIGN.md) ---
 
-// Référence flake d'un input github verrouillé sur son amont : github:<owner>/<repo>/<ref>.
-// `ref` = branche suivie (channel ou branche par défaut). Résout au dernier commit de la
-// branche à l'évaluation → cible d'un --override-input pour prévisualiser une mise à jour.
+// Flake reference of a github input pinned to its upstream: github:<owner>/<repo>/<ref>.
+// `ref` = the tracked branch (channel, or the default branch). It resolves to that branch's
+// latest commit at evaluation time → the target of an --override-input previewing an update.
 function githubFlakeRef(owner, repo, ref) {
     return "github:" + owner + "/" + repo + "/" + ref;
 }
 
-// nix build du toplevel de la config NixOS <host> du flake <path>, SANS activation.
-// `--no-link` : pas de symlink `result` ; `--print-out-paths` : imprime le store path du
-// toplevel (= cible du nvd diff). `overrides` (optionnel) : liste { name, ref } d'inputs à
-// pointer sur leur amont via `--override-input` — évalue « comme si mis à jour » **sans
-// écrire flake.lock ni activer** (cf. DESIGN.md : aperçu de mise à jour, lecture seule).
-// Argv (path, host, refs restent des éléments distincts : pas de découpage shell).
+// nix build of the toplevel of flake <path>'s NixOS configuration <host>, WITHOUT
+// activating it. `--no-link`: no `result` symlink; `--print-out-paths`: print the toplevel's
+// store path (the nvd diff's target). `overrides` (optional): a list of { name, ref } inputs
+// to point at their upstream through `--override-input` — evaluating *as if updated*
+// **without writing flake.lock and without activating** (see DESIGN.md: update preview,
+// read-only). Argv: path, host and refs stay distinct elements, with no shell splitting.
 function buildToplevel(flakePath, host, overrides) {
     var args = ["build", flakePath + "#nixosConfigurations." + host + ".config.system.build.toplevel", "--no-link", "--print-out-paths"];
     var list = overrides || [];
-    // Aperçu de mise à jour : force la re-résolution du dernier amont (les refs
-    // github:owner/repo/branch sont sinon mis en cache par tarball-ttl → un correctif
-    // amont récent resterait invisible au « réessayer »).
+    // Update preview: force upstream to be re-resolved. Without this, github:owner/repo/branch
+    // refs are cached under tarball-ttl, so a recent upstream fix would stay invisible to a
+    // retry.
     if (list.length > 0)
         args.push("--refresh");
     for (var i = 0; i < list.length; i++)
@@ -64,13 +64,13 @@ function buildToplevel(flakePath, host, overrides) {
     return args;
 }
 
-// nvd diff <current> <target> → aperçu texte des changements de closure. `current` défaut
-// `/run/current-system` (génération active). Argv pour la commande `nvd`.
+// nvd diff <current> <target> → a text preview of the closure's changes. `current` defaults
+// to `/run/current-system`, the active generation. Argv for the `nvd` command.
 function nvdDiff(current, target) {
     return ["diff", current || "/run/current-system", target];
 }
 
-// hostname → résout l'hôte courant quand il n'est pas configuré (clé de nixosConfigurations).
+// hostname → resolves the current host when none is configured (a nixosConfigurations key).
 function hostnameArgv() {
     return ["hostname"];
 }
