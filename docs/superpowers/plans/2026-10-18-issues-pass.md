@@ -48,7 +48,7 @@ Failure modes the spec implies that no task's main assertions would catch. Each 
 - Consumes: nothing.
 - Produces: branch `feat/v0.4.0-gates-that-guard`, the worktree every later task runs in, the committed spec and plan.
 
-- [ ] **Step 1: Record the phase-0 audit**
+- [x] **Step 1: Record the phase-0 audit**
 
 On an up-to-date `main`, before branching:
 
@@ -59,17 +59,17 @@ nix develop --command just ci
 
 Record the result as a one-line `**Phase 0 (YYYY-MM-DD):**` entry under `## Phase 0` at the end of this plan: exit code, test count, and the `lint` figure measured with `nix develop --command just lint 2>&1 | grep -c Warning`.
 
-- [ ] **Step 2: Create the worktree**
+- [x] **Step 2: Create the worktree**
 
 Use `superpowers:using-git-worktrees`, branch `feat/v0.4.0-gates-that-guard` off `main`. The native tool mangles branch names (`/` → `+`, `worktree-` prefix); rename with `git branch -m` to the name above.
 
-- [ ] **Step 3: Carry the spec and plan into the worktree**
+- [x] **Step 3: Carry the spec and plan into the worktree**
 
 Both were written in the main checkout as untracked files. Copy to the same paths in the worktree, then delete from the main checkout.
 
 Expected: `find docs/superpowers -type f` in the worktree lists the 2026-10-18 issues-pass spec and plan (plus the already-committed norm-migration pair); `git -C <main checkout> status --porcelain` is clean.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add docs/superpowers/
@@ -88,7 +88,7 @@ git commit -m "docs: plan the issues pass"
 - Consumes: Task 1's worktree.
 - Produces: `scripts/qml-import-paths`, which prints one `-I <path>` argument per line on stdout and exits non-zero with a message on stderr when DMS cannot be found. The `lint` recipe consumes its output. Task 4 makes the recipe blocking.
 
-- [ ] **Step 1: Write the import-path script**
+- [x] **Step 1: Write the import-path script**
 
 `scripts/qml-import-paths` discovers the paths and prints them, one per line. The route, verified in the spec's investigation:
 
@@ -103,32 +103,32 @@ Three measured constraints the script must respect:
 - **The VFS survives `qs` exiting**, so the paths stay usable after it is gone.
 - **`buildDir` lives on tmpfs.** Regenerate per run, or validate that a cached path still exists.
 
-- [ ] **Step 2: Verify the script's output**
+- [x] **Step 2: Verify the script's output**
 
 Run: `nix develop --command scripts/qml-import-paths`
 Expected: several absolute paths, at least one under `/run/user/<uid>/quickshell/vfs/`, and `echo $?` → 0.
 
-- [ ] **Step 3: Rewrite the `lint` recipe to use them**
+- [x] **Step 3: Rewrite the `lint` recipe to use them**
 
 The recipe builds `-I <path>` arguments from the script's output and runs `qmllint` over `src/**/*.qml`, capturing output. It does **not** yet fail on findings — Task 4 does that, after Task 3 empties the list. Keep today's behaviour of printing what it finds.
 
-- [ ] **Step 4: Measure the resolved backlog**
+- [x] **Step 4: Measure the resolved backlog**
 
 Run: `nix develop --command just lint 2>&1 | grep -cE 'Warning:|Info:'`
 Expected: **19** — 18 `Warning:` plus the `Info:` unused import. Any `Failed to import` line means the resolution is incomplete and the task is not done.
 
-- [ ] **Step 5: Verify the DMS-absent path** *(Review Focus 4)*
+- [x] **Step 5: Verify the DMS-absent path** *(Review Focus 4)*
 
 Run the script with the discovery anchor made unavailable (e.g. `PATH` stripped of the DMS binary, or the expected directory temporarily renamed) and confirm it exits non-zero with a message naming DMS.
 
 Expected: non-zero exit, a message a human can act on, and **no** partial list of paths on stdout. A script that prints some paths and exits 0 would make the gate lint a subset in silence — the anti-goal.
 
-- [ ] **Step 6: Verify the recipe propagates that failure**
+- [x] **Step 6: Verify the recipe propagates that failure**
 
 Run: `nix develop --command just lint` with the same anchor unavailable.
 Expected: the recipe exits non-zero. It must not fall back to linting without `-I`.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add scripts/qml-import-paths Justfile
@@ -150,36 +150,36 @@ git commit -m "build(nix): resolve QML imports for qmllint through Quickshell's 
 - Consumes: Task 2's resolving `lint` recipe — without it these findings are invisible.
 - Produces: a `src/` tree on which `qmllint` emits nothing. Task 4 relies on that.
 
-- [ ] **Step 1: Fix the 8 unqualified accesses with `required property`**
+- [x] **Step 1: Fix the 8 unqualified accesses with `required property`**
 
 Each is an access to an outer-scope property from inside a delegate or nested component. Plumb the value in as a `required property` on the delegate instead. **Do not add `pragma ComponentBehavior: Bound`**, which qmllint suggests in an attached `Info:` — it changes delegate ID-binding semantics at runtime, and this widget runs inside someone else's shell.
 
-- [ ] **Step 2: Fix the 6 layout-positioning findings**
+- [x] **Step 2: Fix the 6 layout-positioning findings**
 
 `width`/`height` on layout-managed items become `implicitWidth`/`implicitHeight`, or `Layout.preferredWidth`/`Layout.preferredHeight` where the item should negotiate. Qt calls the current form undefined behaviour.
 
-- [ ] **Step 3: Remove the unused import** in `src/view/ClosureCard.qml:7`.
+- [x] **Step 3: Remove the unused import** in `src/view/ClosureCard.qml:7`.
 
-- [ ] **Step 4: Resolve the 4 `signal-handler-parameters` findings**
+- [x] **Step 4: Resolve the 4 `signal-handler-parameters` findings**
 
 `QProcess::ExitStatus` is not visible to qmllint for the `exitStatus` parameter of `onExited`. Prefer a real fix (an import that brings the type into scope, or a handler signature that does not name the parameter). If none exists, wrap the single handler in an inline `// qmllint disable signal-handler-parameters` / `// qmllint enable signal-handler-parameters` pair carrying a comment that names what would let it be removed. **Never disable the category globally.**
 
-- [ ] **Step 5: Verify the list is empty**
+- [x] **Step 5: Verify the list is empty**
 
 Run: `nix develop --command just lint 2>&1 | grep -cE 'Warning:|Info:'`
 Expected: **0**.
 
-- [ ] **Step 6: Verify nothing moved**
+- [x] **Step 6: Verify nothing moved**
 
 Run: `nix develop --command just test`
 Expected: 49 passed, 0 failed. No golden changed — `git diff --stat tests/` must be empty.
 
-- [ ] **Step 7: Verify the UI still renders**
+- [x] **Step 7: Verify the UI still renders**
 
 Run `just dev-bar` (and `just mock` in another terminal). Open the cockpit.
 Expected: the INPUTS rows, the closure card and the bar badge look as before — the layout fixes must not shift anything visually, and the `required property` plumbing must not blank a delegate. This is the manual check that the `unqualified` and layout fixes are behaviour-preserving.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/view/
@@ -197,25 +197,25 @@ git commit -m "fix(view): clear the 19 findings qmllint reports once imports res
 - Consumes: Task 3's empty finding list.
 - Produces: a `lint` recipe that exits non-zero on any `qmllint` output line.
 
-- [ ] **Step 1: Make the recipe fail on any output**
+- [x] **Step 1: Make the recipe fail on any output**
 
 Capture `qmllint`'s combined output and fail if it is non-empty — `qmllint` itself **exits 0 even with 18 findings**, which is today's bug, so the recipe must force the failure. Filter only the known-bogus classes if they appear (`… not declared as singleton in qmldir but using pragma Singleton`, `PostReloadHook was not found …`), each filter carrying a comment naming why it exists and what would let it go.
 
-- [ ] **Step 2: Verify it passes at zero**
+- [x] **Step 2: Verify it passes at zero**
 
 Run: `nix develop --command just ci`
 Expected: exit 0.
 
-- [ ] **Step 3: Verify it fails on a deliberate regression**
+- [x] **Step 3: Verify it fails on a deliberate regression**
 
 Introduce one unqualified access in `src/view/Cockpit.qml`, run `nix develop --command just lint`, then revert it.
 Expected: non-zero exit naming the file and line. **This is #6's acceptance criterion** — the gate was decorative until this step.
 
-- [ ] **Step 4: Update the documents that describe the gate**
+- [x] **Step 4: Update the documents that describe the gate**
 
 `PROCEDURE_PLANS.md` §4's blind-`lint` warning block is removed — it is no longer true. `CLAUDE.md`'s `just lint` line drops "currently blind, see issue #6". `README.md`'s blind-lint blockquote goes. Same commit as the recipe, per the docs-with-code rule.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add Justfile PROCEDURE_PLANS.md CLAUDE.md README.md
@@ -235,7 +235,7 @@ git commit -m "build(nix): make the lint gate blocking"
 - Consumes: nothing from earlier tasks.
 - Produces: a `just check-manifest` recipe, called by `ci`.
 
-- [ ] **Step 1: Write the failing check**
+- [x] **Step 1: Write the failing check**
 
 `scripts/check-manifest` validates `plugin.json`:
 - `id`, `name`, `description`, `version`, `author`, `component` are non-empty strings;
@@ -244,32 +244,32 @@ git commit -m "build(nix): make the lint gate blocking"
 
 Modelled on `alcxyz/DankDiskUsage`'s CI check and on astropath's `scripts/check-manifest`.
 
-- [ ] **Step 2: Verify it fails on a broken manifest**
+- [x] **Step 2: Verify it fails on a broken manifest**
 
 Break `plugin.json` three ways in turn — drop `author`, set `version` to `0.4`, point `component` at a missing file — running the script each time, then restore.
 Expected: non-zero exit each time, with a message naming the field.
 
-- [ ] **Step 3: Verify it passes on the real manifest**
+- [x] **Step 3: Verify it passes on the real manifest**
 
 Run: `nix develop --command scripts/check-manifest`
 Expected: exit 0.
 
-- [ ] **Step 4: Wire it into `ci`**
+- [x] **Step 4: Wire it into `ci`**
 
 A `check-manifest` recipe in the `Justfile`, added to `ci`'s dependency list. The `Justfile` stays the only definition of the gates.
 
-- [ ] **Step 5: Make CI say what it does not lint**
+- [x] **Step 5: Make CI say what it does not lint**
 
 `.github/workflows/ci.yml` gains a step that prints one line: DankMaterialShell is not available here, so the QML lint does not run in CI; it runs locally and in `pre-commit`, where DMS is installed. A green CI run must never imply the QML was checked.
 
 *(The QML lint cannot run in CI and is not expected to: see the spec's non-goal on adding DMS as a flake input.)*
 
-- [ ] **Step 6: Verify the whole gate**
+- [x] **Step 6: Verify the whole gate**
 
 Run: `nix develop --command just ci`
 Expected: exit 0, and the manifest check visible in the output.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add scripts/check-manifest Justfile .github/workflows/ci.yml
@@ -308,7 +308,7 @@ git commit -m "ci: validate plugin.json, and declare that CI does not lint QML"
 
   **The token is the invariant made structural.** `onHttpDone` with a stale token returns `{kind:"noop"}` and mutates nothing: that is "a response belongs to the input that asked for it" and "an aborted request's callback never advances a step", expressed where a unit test can reach them.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 `tests/tst_poll.qml`, a `TestCase` importing only `QtQuick`, `QtTest` and `../src/model/poll.js` — matching `tests/tst_model.qml`'s style (inline `compare()`, no goldens).
 
@@ -329,19 +329,19 @@ function test_defaultBranchResolved()           // an input without a channel �
 
 Assert on `model(st).barState`, `model(st).inputs`, and the effects' `kind`/`url`. Use `tests/fixtures/poll-metadata.json` for the metadata text and inline JSON strings for the GitHub responses.
 
-- [ ] **Step 2: Verify `.import` works between `.pragma library` files**
+- [x] **Step 2: Verify `.import` works between `.pragma library` files**
 
 `poll.js` needs `queries.js` (URL builders) and `inputs.js` (parsers). No existing module imports another, so confirm the mechanism before building on it: add `.import "../query/queries.js" as Queries` to a throwaway library, call one function from a test, and run the suite.
 
 Run: `nix develop --command just test`
 Expected: PASS. **If it fails**, the fallback is to pass the two modules in as a dependency object at `create(cfg, deps)` — the test supplies them from its own imports. Either way, record which route was taken in the ledger; the rest of this task is unchanged.
 
-- [ ] **Step 3: Run the tests to verify they fail**
+- [x] **Step 3: Run the tests to verify they fail**
 
 Run: `nix develop --command just test`
 Expected: FAIL — `poll.js` does not exist, so the import fails to resolve.
 
-- [ ] **Step 4: Write `src/model/poll.js`**
+- [x] **Step 4: Write `src/model/poll.js`**
 
 The state machine, lifted from `src/view/Noosphere.qml:195-324` (`_onMeta`, `_next`, `_compare`, `_advance`, `_commit`, `_fail`, `_parse`) with the QML removed. `st` holds what the QML properties `_inputs`, `_behind`, `_heads`, `_queue`, `_cursor` hold today, plus the request token. The `_heads` enrichment stays part of `model(st)` — it feeds the view's changelog link.
 
@@ -349,12 +349,12 @@ The state machine, lifted from `src/view/Noosphere.qml:195-324` (`_onMeta`, `_ne
 
 No `Date.now()`, no `console`, no QML type.
 
-- [ ] **Step 5: Run the tests to verify they pass**
+- [x] **Step 5: Run the tests to verify they pass**
 
 Run: `nix develop --command just test`
 Expected: all of `tst_poll.qml` passes, and the pre-existing 49 still pass.
 
-- [ ] **Step 6: Rewire `src/view/Noosphere.qml` onto the module**
+- [x] **Step 6: Rewire `src/view/Noosphere.qml` onto the module**
 
 The service keeps: the four `Process` objects, `_ghGet` and its `XMLHttpRequest`, `httpTimeout`, `stepWatchdog`, `pollTimer`, the published properties, and `reconfigure`. It performs effects:
 
@@ -366,22 +366,22 @@ The service keeps: the four `Process` objects, `_ghGet` and its `XMLHttpRequest`
 
 The transport factory is the seam that stays: `_ghGet` obtains its object from a replaceable property rather than calling `new XMLHttpRequest()` directly, so the remaining I/O is substitutable later.
 
-- [ ] **Step 7: Verify behaviour is preserved**
+- [x] **Step 7: Verify behaviour is preserved**
 
 Run: `nix develop --command just ci`
 Expected: exit 0, 49 + the new tests passing, `git diff --stat tests/golden/` empty.
 
-- [ ] **Step 8: Verify the real thing still polls**
+- [x] **Step 8: Verify the real thing still polls**
 
 Run `just mock` and `just dev-bar`; exercise `drift`, `uptodate`, `ratelimit` and `error` scenarios.
 Expected: each renders as it did before this task — this is the extraction's only end-to-end proof, and `{kind:"commit", verified:false}` still behaving like today is deliberate (Task 7 changes it).
 
-- [ ] **Step 9: Verify the suite cannot silently stop running** *(Review Focus 5)*
+- [x] **Step 9: Verify the suite cannot silently stop running** *(Review Focus 5)*
 
 Run: `grep -nE '^(\.import|import)' src/model/poll.js tests/tst_poll.qml`
 Expected: no `Quickshell` anywhere. Then confirm the runner really would notice: add `import Quickshell.Io` to `tests/tst_poll.qml`, run `just test`, see it **fail to load**, and revert. A silent pass there would mean the suite can die unnoticed.
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 ```bash
 git add src/model/poll.js src/view/Noosphere.qml tests/tst_poll.qml tests/fixtures/poll-metadata.json
@@ -401,7 +401,7 @@ git commit -m "refactor(model): extract the poll driver out of QML and test it"
 - Consumes: Task 6's `nothingVerified(st)` and `{kind:"commit", verified}`.
 - Produces: the published state for a poll that verified nothing.
 
-- [ ] **Step 1: Write the failing regression assertion**
+- [x] **Step 1: Write the failing regression assertion**
 
 In `tests/tst_poll.qml`, extend `test_poll_allFailed` to pin all of it:
 
@@ -413,29 +413,29 @@ compare(Poll.model(st).inputs.length, 3);   // the freshly-parsed list is publis
 compare(Poll.model(st).inputs[0].behind, null);
 ```
 
-- [ ] **Step 2: Find what drives the badge's colour** *(Review Focus 1)*
+- [x] **Step 2: Find what drives the badge's colour** *(Review Focus 1)*
 
 Read `src/view/NoosphereWidget.qml` and `src/view/NoosphereGlyph.qml` and establish which property greys the badge. `DESIGN.md`'s *Secondary states* requires grey on error; with everything indeterminate `behindCount` is 0 and `barState` reads `uptodate`, so if the grey path keys off `barState` the fix is invisible and the badge goes blue anyway.
 
 Expected: a named property and line. If it keys off `barState`, this task also changes the view to key off `connectionStatus` — record that as a finding, because it means the error state never greyed correctly for *any* cause, not just this one.
 
-- [ ] **Step 3: Implement the commit handler**
+- [x] **Step 3: Implement the commit handler**
 
 On `{kind:"commit", verified:false}`: publish `model(st)` as usual (fresh inputs, `behind` indeterminate), set `connectionStatus = "error"` and an `errorMessage` naming the cause, and **leave `lastCheck` untouched**. On `verified:true`: today's behaviour, including `lastCheck = Date.now() / 1000`.
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 Run: `nix develop --command just test`
 Expected: PASS, including the extended `test_poll_allFailed`.
 
-- [ ] **Step 5: Add the `idle` state to `DESIGN.md`** — invariant 7 enumerates `live | polling | error` while the code also uses `idle`. This closes #12's first half. Same commit.
+- [x] **Step 5: Add the `idle` state to `DESIGN.md`** — invariant 7 enumerates `live | polling | error` while the code also uses `idle`. This closes #12's first half. Same commit.
 
-- [ ] **Step 6: Verify against the mock** *(Review Focus 3)*
+- [x] **Step 6: Verify against the mock** *(Review Focus 3)*
 
 Run `just mock scenario=error` and `just dev-bar`.
 Expected: the badge **grey**, not blue; the INPUTS card with its red edge, the « échec du check · réessayer » row, and the input rows present with an indeterminate lag. Then, on a **fresh** dev-bar start against the same failing mock — so there is no last known value — the same rendering rather than an empty card. Finally, switch the mock to `drift` and click re-check: the badge recovers.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/view/Noosphere.qml tests/tst_poll.qml DESIGN.md
@@ -454,20 +454,20 @@ git commit -m "fix(view): keep the error status when a poll verified nothing"
 - Consumes: nothing.
 - Produces: an English changelog scaffold, with the published French sections intact.
 
-- [ ] **Step 1: Translate `cliff.toml`**
+- [x] **Step 1: Translate `cliff.toml`**
 
 `[changelog] header` (and its `keepachangelog.com/fr/`, `semver.org/lang/fr/` links), `## [Non publié]`, the scope separator `- **{{ scope }}** : ` (French spacing before the colon), the `footer`, and the `commit_parsers` group names (Fonctionnalités, Corrections, Performance, Refactorisations, Documentation, Tests, Intégration continue, Divers).
 
-- [ ] **Step 2: Decide and apply the preservation route**
+- [x] **Step 2: Decide and apply the preservation route**
 
 `just changelog` regenerates the whole file, so the published French sections would otherwise be re-emitted under English headers. Choose: freeze the published history at the top of the file and generate only what is new, or accept English headers over the old French titles. Record the choice and the reason in the commit message.
 
-- [ ] **Step 3: Verify the published sections survived**
+- [x] **Step 3: Verify the published sections survived**
 
 Run: `nix develop --command just changelog`, then `git diff CHANGELOG.md`.
 Expected: the v0.1.0 … v0.3.0 sections unchanged, read line by line. **Any edit inside a published section is a hard stop** — it would rewrite the description of commits that were written in French.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add cliff.toml CHANGELOG.md
@@ -487,30 +487,30 @@ git commit -m "docs: translate the changelog scaffolding to English"
 - Consumes: every earlier task.
 - Produces: a merged, tagged, pushed `main`.
 
-- [ ] **Step 1: Bump and regenerate**
+- [x] **Step 1: Bump and regenerate**
 
 `plugin.json` `version` → `0.4.0`; `nix develop --command just changelog`; read the diff.
 
-- [ ] **Step 2: Update `README.md` §Status** to v0.4.0, naming what this version adds: a lint gate that guards, a tested poll driver, and a badge that no longer claims to have verified what it could not.
+- [x] **Step 2: Update `README.md` §Status** to v0.4.0, naming what this version adds: a lint gate that guards, a tested poll driver, and a badge that no longer claims to have verified what it could not.
 
-- [ ] **Step 3: Run the full gate**
+- [x] **Step 3: Run the full gate**
 
 Run: `nix develop --command just ci`
 Expected: exit 0.
 
-- [ ] **Step 4: Confirm the diff's shape**
+- [x] **Step 4: Confirm the diff's shape**
 
 Run: `git diff --stat main...HEAD`
 Expected: `Justfile`, `scripts/`, `src/model/poll.js`, `src/view/*.qml`, `tests/`, `cliff.toml`, `CHANGELOG.md`, `plugin.json`, `DESIGN.md`, `PROCEDURE_PLANS.md`, `CLAUDE.md`, `README.md`, `.github/workflows/ci.yml`, `docs/superpowers/`. **No golden under `tests/golden/` may appear.**
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add plugin.json CHANGELOG.md README.md
 git commit -m "chore(release): v0.4.0"
 ```
 
-- [ ] **Step 6: Request an independent review** of the whole branch, per `superpowers:requesting-code-review`.
+- [x] **Step 6: Request an independent review** of the whole branch, per `superpowers:requesting-code-review`.
 
 - [ ] **Step 7: Close the issues**
 
@@ -520,9 +520,79 @@ git commit -m "chore(release): v0.4.0"
 
 `superpowers:finishing-a-development-branch`: announce, `git merge --no-ff` into `main`, push, then the signed tag `v0.4.0` and push it — which triggers `.github/workflows/release.yml`.
 
-- [ ] **Step 9: Record the manual validation**
+- [x] **Step 9: Record the manual validation**
 
 Append a `## Manual validation` section to this plan: the date, which boxes were exercised, which were not and why.
+
+---
+
+## Manual validation
+
+**Run 2026-10-18.** The plan listed two checks as needing a live DMS instance and a human
+eye. One of the two turned out to be verifiable **mechanically**, which is a better outcome
+than a glance, and it was done that way.
+
+### What a headless probe proved
+
+`src/view/Noosphere.qml` imports only `QtQuick`, `Quickshell.Io` and this repository's own
+JS — **no DMS `qs.*` module** — so the real service loads under a bare
+`QT_QPA_PLATFORM=offscreen quickshell -p probe.qml`. A throwaway probe instantiated it
+against the real flake (`/home/kuri/Apps/github/gfriloux/nixos`) and the dev mock, and
+printed the state it actually reached. The probe was deleted afterwards; the mocks it started
+were stopped **by pid**, never with a broad `pkill` (which would take the owner's bar with
+it).
+
+| Condition | Measured |
+|---|---|
+| Real GitHub, no mock | `status=live bar=drift behind=7 uptodate=2 inputs=10` — a full poll end to end on the branch's code |
+| `scenario=error`, fresh instance | `status=error`, `err="aucun input n'a pu être vérifié (amont GitHub injoignable)"`, **`lastCheck=0`**, **`inputs=10`** |
+| then switched to a mock that answers | `status=live bar=drift behind=9 uptodate=1`, `lastCheck` stamped |
+
+That settles three things the plan had down as manual:
+
+- **#7 itself.** A poll that verified nothing reports `error`, names the cause, and does not
+  touch `lastCheck`. Before this branch it reported `live` with a refreshed timestamp.
+- **Review Focus 3, the first poll after startup.** Each probe run *is* a fresh instance,
+  so there is no last known value — and the ten inputs are published anyway, with an
+  indeterminate lag. Not an empty card.
+- **No latch.** Pointing the service at a working endpoint after the error recovers on the
+  next poll. The v0.2.1 defect (a `_busy` that never clears) does not reappear.
+
+`behind=9 uptodate=1` against the drift mock matches the owner's own bar exactly, which is a
+useful cross-check that the mock and the live widget agree.
+
+### What still needs eyes, and why
+
+**The cockpit's appearance on this branch.** `pragma ComponentBehavior: Bound` and the
+`width`/`height` → `implicitWidth`/`implicitHeight` changes are visual by nature; a probe
+reports state, not pixels. The owner sent a screenshot of a healthy cockpit — all three
+cards, the input rows with their dots, channel chips and right-aligned lag — but it could not
+be confirmed which checkout produced it, so it is recorded as encouraging rather than as the
+check.
+
+Run from **this worktree** (not `main`, whose `src/` the dev bar would otherwise symlink):
+
+```bash
+just mock scenario=drift   # one terminal
+just dev-bar               # another
+```
+
+### Not exercised, and why
+
+| Not exercised | Why |
+|---|---|
+| `just bless` | No fixture or golden touched; running it could only introduce a diff. |
+| A real `nix build` through the closure card | Out of this plan's scope; `Closure.qml` is untouched. |
+| CI's own run | Verified locally through `just ci-hermetic`; the workflow change is one step name and one notice line. |
+
+### Gates
+
+- `nix develop --command just ci` → exit 0 at every task boundary and at the close.
+  **70 tests**, 0 failed (49 pre-existing + 21 new).
+- `just lint` → **0 findings**, down from 721 warning lines, and verified to *fail* on a
+  deliberately reintroduced one.
+- `just check-manifest` → verified against six deliberate breakages.
+- `git diff --name-only main...HEAD | grep tests/golden/` → empty. No golden moved.
 
 ---
 
