@@ -8,10 +8,10 @@ noosphere compares the local `flake.lock` (`nix flake metadata --json`) against 
 upstream branch on **GitHub** (compare API) — **read-only**, by polling. **Nothing to
 install server-side**, and **no mutation** of the system: noosphere *watches* drift.
 
-> **English is the project's default language** — documentation, code comments and commit
-> messages. The **widget's UI copy is still French**, pending its own internationalisation
-> plan (EN/FR); the labels quoted below are the literal French strings you will see on
-> screen.
+> **English is the project's default language** — documentation, code comments, commit
+> messages, and the software's own copy. The **widget's UI copy is still French**, pending
+> its own internationalisation plan (EN/FR), after which French becomes one locale of two;
+> the labels quoted below are the literal French strings you will see on screen today.
 
 Spirit and invariants: [`DESIGN.md`](./DESIGN.md). Working method:
 [`PROCEDURE_PLANS.md`](./PROCEDURE_PLANS.md) and [`CLAUDE.md`](./CLAUDE.md).
@@ -44,7 +44,7 @@ process, so the token never reaches a command line. The **cockpit popout** provi
 
 noosphere stays **read-only as far as the system is concerned**: it observes (and builds on
 demand), it never activates. Still to come (mutations require an explicit DESIGN decision
-and a dedicated plan): *update* / *update all* buttons (`nix flake update`), and a
+and a dedicated plan): *update* / *Update all* buttons (`nix flake update`), and a
 **rebuild** card (timeline + rollback). Foundations, invariants and visual direction:
 `DESIGN.md`.
 
@@ -57,6 +57,11 @@ qmltestrunner, just):
 nix develop
 just ci        # full gate: fmt-check + lint + test
 ```
+
+> **The `lint` leg currently guards nothing.** `qmllint` runs with no `-I` import path, so it
+> fails at `import QtQuick`, cascades into unresolved-type noise, and still exits 0 — 717
+> warning lines on a green run. A green `just ci` proves `fmt-check` and `test`, and nothing
+> about QML. Tracked in [issue #6](https://github.com/gfriloux/noosphere/issues/6).
 
 Other targets: `just test` (golden + Qt Quick Test), `just fmt` (formats the QML),
 `just bless` (regenerates the goldens — read the diff), `just changelog` (regenerates

@@ -1,6 +1,6 @@
 # noosphere's working norm moves to superpowers — Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: use **superpowers:executing-plans** to implement this plan task-by-task — native execution is this repository's default, for the reason given in `PROCEDURE_PLANS.md` §1 (the announce-a-commit-series rule needs commits arriving from one context). `superpowers:subagent-driven-development` is the alternative, and taking it is a decision made at the plan review with the extra signing prompts named out loud. Steps use checkbox (`- [ ]`) syntax for tracking; both skills keep the same ledger.
 
 **Goal:** Replace noosphere's house process with the superpowers norm, delegate git to the
 agent, make GitHub Issues the only backlog, and ship `DESIGN.md`, `PROCEDURE_PLANS.md` and
@@ -76,7 +76,7 @@ its own. Each one has a check attached to the task that owns it.
 - Produces: the branch `docs/superpowers-working-norm` and the worktree every later task
   runs in; the committed spec and plan at the paths the spec fixes.
 
-- [ ] **Step 1: Record the phase-0 audit**
+- [x] **Step 1: Record the phase-0 audit**
 
 Run on an up-to-date `main`, before branching:
 
@@ -89,12 +89,12 @@ Write the result into this plan as a one-line `**Phase 0 (YYYY-MM-DD):**` entry 
 below this step — exit code, and for `lint` the fact that it is blind per #6. Never assume
 the tree is clean.
 
-- [ ] **Step 2: Create the isolated worktree**
+- [x] **Step 2: Create the isolated worktree**
 
 Use `superpowers:using-git-worktrees` to get a worktree on a new branch
 `docs/superpowers-working-norm` off `main`.
 
-- [ ] **Step 3: Carry the spec and the plan into the worktree**
+- [x] **Step 3: Carry the spec and the plan into the worktree**
 
 The design and this plan were written in the main checkout as untracked files. Copy both
 into the worktree at the same paths, then delete them from the main checkout so only one
@@ -103,7 +103,7 @@ copy exists.
 Expected: `ls docs/superpowers/specs docs/superpowers/plans` in the worktree lists both
 files; `git -C <main checkout> status --porcelain` no longer shows them.
 
-- [ ] **Step 4: Add `.superpowers/` to `.gitignore`**
+- [x] **Step 4: Add `.superpowers/` to `.gitignore`**
 
 Insert next to the existing `tmp/` block. The comment must say why the rule lives at the
 repository root: `.superpowers/sdd/.gitignore` is created by the tooling, covers only
@@ -112,18 +112,25 @@ with unignored scratch. Update the `.claude/` comment in the same file: "les pla
 sont versionnés" becomes a statement that `.claude/plans/` is a frozen archive. Both
 comments in English.
 
-- [ ] **Step 5: Verify the leak is closed where it would leak**
+- [x] **Step 5: Verify the leak is closed where it would leak**
 
 Run **from the worktree**, not the main checkout:
 
 ```bash
+git check-ignore -v .superpowers/x        # only the root rule can match this path
 git check-ignore -v .superpowers/sdd/x
 ```
 
-Expected: the matching rule reported is the root `.gitignore`'s `.superpowers/` line.
-A report naming `.superpowers/sdd/.gitignore`, or no output at all, is a failure.
+Expected: both report the root `.gitignore`'s `.superpowers/` line. No output at all is a
+failure.
 
-- [ ] **Step 6: Commit**
+The first path is the one that proves anything. `sdd-workspace` creates
+`.superpowers/sdd/.gitignore` containing `*`, so a check on `.superpowers/sdd/x` prints an
+ignore rule whether or not the root rule is correct — a mis-spelled root rule would look
+identical to a working one. Nothing under `sdd/` can match `.superpowers/x`, so only the root
+rule can. *(Second path added during execution; ruled in the ledger.)*
+
+- [x] **Step 6: Commit**
 
 ```bash
 git add .gitignore docs/superpowers/
@@ -144,14 +151,16 @@ git commit -m "docs: adopt the superpowers document tree and ignore agent scratc
   table and its section structure preserved; `tmp/design-fr-en.md` as the artifact the owner
   reads in Task 6.
 
-- [ ] **Step 1: Inventory the French strings that must survive untranslated**
+- [x] **Step 1: Inventory the French strings that must survive untranslated**
 
 ```bash
 grep -oE '«[^»]*»' DESIGN.md | sort -u
 ```
 
-For each result, run `grep -rF '<string>' src/`. A hit means the string is a live UI literal
-and **stays French**. No hit means it is prose or copy for UI that does not exist, and it
+For each result, run `grep -rF '<fragment>' src/` on its invariant French fragment. A hit **in
+a rendered string** means the literal stays French; a hit only in a code comment does not
+count, since comments are themselves bound for English under chantier 3. No hit at all means
+it is prose or copy for UI that does not exist, and it
 **translates**. Record the two lists in `tmp/design-fr-en.md`.
 
 Known from the spec, verified: stays French — «&nbsp;N commits en retard&nbsp;»,
@@ -162,7 +171,7 @@ changements&nbsp;», «&nbsp;update&nbsp;». `EN-TÊTE` is **not** a UI literal:
 in `src/view/Cockpit.qml` comments and one `src/view/Settings.qml` description, so the card
 is called the *header* card in English.
 
-- [ ] **Step 2: Translate `DESIGN.md`**
+- [x] **Step 2: Translate `DESIGN.md`**
 
 A translation, not a revision. Preserve: the eleven numbered invariants and their order, the
 three-stage pipeline diagram, the colour table's hex values, the bar-state mapping table,
@@ -172,30 +181,45 @@ the future-caps table, every section and its order. Domain vocabulary: *dérive*
 the remaining French literals are French *pending* the English/i18n plan, so a reader does
 not read them as a missed translation.
 
-- [ ] **Step 3: Build the clause-by-clause correspondence table**
+- [x] **Step 3: Build the clause-by-clause correspondence table**
 
 Append to `tmp/design-fr-en.md`: each invariant, each normative visual-system rule and each
 imperative sentence, old beside new, sourced from `git show HEAD:DESIGN.md`. This is what
 the owner reads in Task 6 instead of diffing two documents in parallel. It stays in `tmp/`
 and is never committed.
 
-- [ ] **Step 4: Run the half-translation check**
+- [x] **Step 4: Run the half-translation check**
+
+The check targets French **prose**, so it strips the deliberate French literals first — a
+quoted literal legitimately contains a word from the pattern (« dérive », in the Adeptus
+section):
 
 ```bash
-grep -rniE 'jamais|toujours|le token|la couche|dérive|plan validé' DESIGN.md
+sed 's/«[^»]*»//g' DESIGN.md | grep -niE 'jamais|toujours|le token|la couche|dérive|plan validé'
 ```
 
-Expected: no output.
+Expected: no output. *(Amended during execution: the unstripped form expects empty output
+while the document legitimately quotes « dérive » as a term, so it would fail on correct
+content. Ruled in the ledger.)*
 
-- [ ] **Step 5: Run the quoted-literal check**
+- [x] **Step 5: Run the quoted-literal check**
 
-For every `«…»` string remaining in `DESIGN.md`, `grep -rF '<string>' src/` must hit.
+For every `«…»` string in `DESIGN.md`, its **invariant French fragment** must hit `src/` —
+strip `<…>` placeholders and the `N`/`M`/`A`/`R` count variables first. Nine of the nineteen
+literals are templates (`« lock <age> »` is `"lock "` in the code; `« N commits en retard »`
+is `" commits en retard"`), so `grep -rF` on a whole string cannot hit by construction.
 
-Expected: every string hits. A quoted French string with no hit means either an
-untranslated fragment or a document describing copy that does not exist — both defects,
-and the check cannot tell them apart, so it fails rather than warns.
+Expected: every fragment hits. A fragment that does not hit means either an untranslated
+fragment or a document describing copy that does not exist — both defects, and the check
+cannot tell them apart, so it fails rather than warns.
 
-- [ ] **Step 6: Run the structure checks**
+One documented exception: the Adeptus section's « dérive » and « verrou » hit only in code
+comments. They are named there as **vocabulary**, not as rendered copy, and `DESIGN.md`'s own
+note says exactly that. *(Amended during execution: the unstripped form marks nine real
+rendered literals as defects, and its obvious "fix" is to translate them — an explicit
+anti-goal. Ruled in the ledger.)*
+
+- [x] **Step 6: Run the structure checks**
 
 ```bash
 grep -cE '^[0-9]+\. \*\*' DESIGN.md                      # expected: 11
@@ -204,14 +228,14 @@ grep -oE '#[0-9a-f]{6}' DESIGN.md | sort | uniq -c > /tmp/hex-after
 diff /tmp/hex-before /tmp/hex-after                      # expected: no difference
 ```
 
-- [ ] **Step 7: Dispatch two independent fidelity reviews**
+- [x] **Step 7: Dispatch two independent fidelity reviews**
 
 Two fresh subagents, each given `git show HEAD:DESIGN.md` and the new `DESIGN.md`, each
 asked to report **only** places where the English narrows, widens or changes an invariant,
 a normative rule or a measured value. Fix what they find. They run before the owner's gate
 so that what reaches the owner has had its obvious slips removed; they do not replace it.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add DESIGN.md
@@ -232,7 +256,7 @@ git commit -m "docs: translate DESIGN.md to English"
   header and guardrails describe what `PROCEDURE_PLANS.md` says; shipping them apart leaves
   the repository momentarily self-contradicting.
 
-- [ ] **Step 1: Rewrite `PROCEDURE_PLANS.md` in English, holding only what superpowers cannot know**
+- [x] **Step 1: Rewrite `PROCEDURE_PLANS.md` in English, holding only what superpowers cannot know**
 
 Required content, per the spec: the step→skill→artifact table; when the agent stops
 (decisions, not steps) and which superpowers gates survive; git (branch, atomic commits,
@@ -270,7 +294,7 @@ The language rule, verbatim from the spec:
 Plus: the rule binds GitHub Issues (titles, bodies, comments, PR descriptions), with the
 carve-out that carried measurements are reproduced as verbatim quoted French blocks.
 
-- [ ] **Step 2: Rewrite `CLAUDE.md` in English**
+- [x] **Step 2: Rewrite `CLAUDE.md` in English**
 
 Its header becomes: read `DESIGN.md` — it outranks every skill; the process is superpowers
 (brainstorm → design → plan → execute → review → integrate); `PROCEDURE_PLANS.md` holds
@@ -279,7 +303,7 @@ this project's specifics. Correct the guardrails section for the git decision (d
 tree, naming `.claude/plans/` the frozen archive and `tmp/`, `.superpowers/` as uncommitted
 scratch.
 
-- [ ] **Step 3: Check the gates are not redefined**
+- [x] **Step 3: Check the gates are not redefined**
 
 The gate list in `CLAUDE.md` and `PROCEDURE_PLANS.md` must match the `Justfile`'s recipes
 and be presented as a convenience copy, not a second source.
@@ -288,7 +312,7 @@ Run: `grep -nE 'just (ci|fmt-check|lint|test|bless)' CLAUDE.md PROCEDURE_PLANS.m
 Expected: every recipe named exists in the `Justfile`, and no document states a gate the
 `Justfile` does not define.
 
-- [ ] **Step 4: Run the half-translation check**
+- [x] **Step 4: Run the half-translation check**
 
 ```bash
 grep -rniE 'jamais|toujours|le token|la couche|dérive|plan validé' PROCEDURE_PLANS.md CLAUDE.md
@@ -296,7 +320,7 @@ grep -rniE 'jamais|toujours|le token|la couche|dérive|plan validé' PROCEDURE_P
 
 Expected: no output.
 
-- [ ] **Step 5: Check there is exactly one active process description** *(Review Focus 1)*
+- [x] **Step 5: Check there is exactly one active process description** *(Review Focus 1)*
 
 Read `PROCEDURE_PLANS.md` as a fresh session would. It must describe **no** planning
 workflow of its own — no phases, no plan template, no plan directory convention beyond
@@ -306,7 +330,7 @@ historical from the line that says so.
 Expected: the only active process description in the repository is superpowers, reached
 from `CLAUDE.md`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add PROCEDURE_PLANS.md CLAUDE.md
@@ -324,7 +348,7 @@ git commit -m "docs: replace the house process with the superpowers norm"
 - Consumes: Task 3's norm (the README points readers at it).
 - Produces: a README whose four stated facts are true.
 
-- [ ] **Step 1: Fix the four facts**
+- [x] **Step 1: Fix the four facts**
 
 1. The note "The widget's UI and the project documentation are in **French**" → state the
    rule: documentation and the project's default language are English; UI copy is French
@@ -337,7 +361,7 @@ git commit -m "docs: replace the house process with the superpowers norm"
    section → v0.3.0, mentioning the XHR transport. Fix the version line only; this is not a
    rewrite of the section.
 
-- [ ] **Step 2: Verify**
+- [x] **Step 2: Verify**
 
 ```bash
 grep -nE 'v0\.2\.0|hybrid git|in \*\*French\*\*|\.claude/plans/' README.md
@@ -347,7 +371,7 @@ Expected: no line claims v0.2.0 as the current version, no line claims a hybrid 
 no line claims the documentation is French, and the only `.claude/plans/` mention describes
 it as a frozen archive.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add README.md
@@ -367,7 +391,7 @@ git commit -m "docs: correct the README's language, git and version statements"
 - Produces: a repository with no second backlog. **Order is the deliverable here**: the
   deletion is last, so the content never has a window where git history is its only home.
 
-- [ ] **Step 1: Carry the `lint` measurements into issue #6**
+- [x] **Step 1: Carry the `lint` measurements into issue #6**
 
 `gh issue comment 6` with an English framing and the French measurements as a **verbatim
 quoted block**: `just lint` exits 0 while emitting **745** warnings on `main` @ `2f3a707`;
@@ -378,14 +402,14 @@ root cause (no `-I` toward Quickshell's and Qt6's `qml/` directories, so it fail
 `unqualified`, and still returns 0). State that the ordering matters: without the `-I`
 flags, measuring the real backlog is impossible.
 
-- [ ] **Step 2: Carry the mock measurement into issue #7**
+- [x] **Step 2: Carry the mock measurement into issue #7**
 
 `gh issue comment 7`, same form: measured with the dev mock, `scenario=error` (500 on every
 call) → `status=live`, `behind=0 uptodate=0 bar=uptodate`, both inputs at `behind=null`.
 Add that this predates the v0.3.0 XHR work (same behaviour under `curl`), so it is not a
 regression — it is now measured.
 
-- [ ] **Step 3: Create the three new issues**
+- [x] **Step 3: Create the three new issues**
 
 English titles and bodies.
 
@@ -404,7 +428,7 @@ English titles and bodies.
    in-flight request, and rate-limit conduct to rethink (several requests already sent when
    the 403 arrives). Note that sequential remains the default choice.
 
-- [ ] **Step 4: Verify the content exists before deleting its source** *(Review Focus 3)*
+- [x] **Step 4: Verify the content exists before deleting its source** *(Review Focus 3)*
 
 ```bash
 gh issue view 6 --comments | tail -40
@@ -415,7 +439,7 @@ gh issue list --state open
 Expected: both comments present and carrying the numbers; the three new issues listed. Only
 then proceed.
 
-- [ ] **Step 5: Delete `TODO.md` and commit**
+- [x] **Step 5: Delete `TODO.md` and commit**
 
 ```bash
 git rm .claude/plans/TODO.md
@@ -433,7 +457,7 @@ git commit -m "docs: make GitHub Issues the only backlog"
 - Consumes: every earlier task.
 - Produces: a merged `main`, and a memory directory that cannot reapply the old norm.
 
-- [ ] **Step 1: Replace the two stale memories**
+- [x] **Step 1: Replace the two stale memories**
 
 Delete `git-hybrid-noosphere.md` and `commits-en-anglais.md`, and their `MEMORY.md` index
 lines. The slug is the stale signal — `MEMORY.md`'s index is what a future session reads
@@ -453,13 +477,13 @@ Write in their place:
 
 Bodies stay in French, like every other file in that directory.
 
-- [ ] **Step 2: Correct `noosphere-status.md` in place**
+- [x] **Step 2: Correct `noosphere-status.md` in place**
 
 v0.3.0 is merged (`c276038`), not "finie sur branche, à merger". Add: the new document
 tree, GitHub Issues as the only backlog, the three open issues with #6's blind `lint` gate
 still true, and the three-chantier order (norm → issues + `cliff.toml` → English/i18n).
 
-- [ ] **Step 3: Run the full gate and the confinement check**
+- [x] **Step 3: Run the full gate and the confinement check**
 
 ```bash
 nix develop --command just ci
@@ -470,7 +494,7 @@ Expected: `just ci` green. The diff touches only `CLAUDE.md`, `PROCEDURE_PLANS.m
 `DESIGN.md`, `README.md`, `.gitignore`, `docs/superpowers/`, and the deletion of
 `.claude/plans/TODO.md`. **Any `src/` or `tests/` path in that diff is a hard stop.**
 
-- [ ] **Step 4: Check the memory directory by slug, not only by content** *(Review Focus 5)*
+- [x] **Step 4: Check the memory directory by slug, not only by content** *(Review Focus 5)*
 
 ```bash
 ls ~/.claude/projects/-home-kuri-Apps-github-gfriloux-noosphere/memory/
@@ -480,23 +504,23 @@ grep -c '^- \[' ~/.claude/projects/-home-kuri-Apps-github-gfriloux-noosphere/mem
 Expected: no file whose name or index line suggests hybrid git or a French repository; every
 `MEMORY.md` index line resolves to a file present, and every file present has an index line.
 
-- [ ] **Step 5: Request an independent review of the whole branch**
+- [x] **Step 5: Request an independent review of the whole branch**
 
 Use `superpowers:requesting-code-review`.
 
-- [ ] **Step 6: GATE — the owner reads the translated `DESIGN.md`**
+- [x] **Step 6: GATE — the owner reads the translated `DESIGN.md`**
 
 Hand over `tmp/design-fr-en.md` and the new `DESIGN.md`. **Stop here.** Nothing merges to
 `main` until the owner says the translation is faithful. This is the one stop the spec
 grants autonomy no exception to: `DESIGN.md` outranks every skill, and no mechanical check
 catches a plausible mistranslation that narrows an invariant.
 
-- [ ] **Step 7: Integrate**
+- [x] **Step 7: Integrate**
 
 Use `superpowers:finishing-a-development-branch`. Announce the integration, then
 `git merge --no-ff` into `main` and push. No tag: this work ships no version.
 
-- [ ] **Step 8: Record the manual validation**
+- [x] **Step 8: Record the manual validation**
 
 Append a `## Manual validation` section to this plan: the date, which boxes were exercised,
 and which were not and why.
@@ -507,7 +531,70 @@ and which were not and why.
 
 **Phase 0 (2026-10-18, `main` @ `900c54b`):** `nix develop --command just ci` → **exit 0**,
 `just test` 49 passed / 0 failed. Working tree clean apart from the untracked `docs/` holding
-this spec and plan. `just lint` is blind as issue #6 describes: the same run emits **721
-warning lines**, including 6 `Failed to import`, and still returns 0. The gate is therefore
-green on this work but proves nothing about QML — which is harmless here, since no QML is
-touched.
+this spec and plan. `just lint` is blind as issue #6 describes: measured separately with
+`nix develop --command just lint 2>&1 | grep -c Warning` → **717 warning lines**, of which
+**4** are `Failed to import`, exit 0. The gate is therefore green on this work but proves
+nothing about QML — which is harmless here, since no QML is touched.
+
+*(Corrected after the branch review: the first figure recorded here was 721/6, counted over
+`just ci`'s whole output, which wrongly attributed four warning lines and two import failures
+emitted by the `test` leg to the lint gate.)*
+
+---
+
+## Manual validation
+
+**Run 2026-10-18.** This plan ships documents, `.gitignore`, GitHub issues and memory files;
+no `src/` or `tests/` file is touched, so nothing needed a live DMS instance, Wayland, or the
+dev bar. Every box above was exercised, by command, with the output read — none was taken on
+trust. Not exercised, and why:
+
+| Not exercised | Why |
+|---|---|
+| `just dev-bar`, `just run` | No UI change in this branch. The claims this plan makes *about* them (worktree-compatible `justfile_directory()`, single state root, mock default port) were verified statically in `Justfile` and `scripts/noosphere-dev` instead. |
+| `just bless` | No fixture or golden touched; running it could only introduce a diff. |
+| `just changelog` | `cliff.toml` is out of scope and this branch ships no version. Running it would emit a `[Non publié]` section nobody asked for. |
+
+### Gates
+
+- `nix develop --command just ci` → exit 0, **49 passed / 0 failed**. Run at phase 0, at the
+  close of Task 3, and again after the fix pass.
+- `git diff --stat main...HEAD` confined to `.gitignore`, `CLAUDE.md`, `DESIGN.md`,
+  `PROCEDURE_PLANS.md`, `README.md`, `docs/superpowers/`, and the deletion of
+  `.claude/plans/TODO.md`. `git diff --name-only main...HEAD | grep -E '^(src|tests)/'` →
+  empty. The plan's hard stop never triggered.
+- All commits `%G?` = `G`, correct signing identity, `Co-Authored-By` trailer present.
+
+### Review Focus — outcome of each
+
+1. **Two active process documents** — closed. `PROCEDURE_PLANS.md` describes no planning
+   workflow of its own; §1 is a pointer table to the skills. Confirmed by the branch reviewer
+   independently.
+2. **A mistranslation narrowing an invariant** — three real defects found and fixed, none by
+   a mechanical check: the Mechanicus vocabulary list had been translated in breach of the
+   quoting rule; « retard » had become both *behind* and *lag*; `#f9e2af` had become "Amber",
+   a name in neither the Catppuccin palette nor the code. This is the item that justified
+   both the two fidelity reviews and the owner's gate.
+3. **`TODO.md` content surviving only in git history** — closed. All five entries verified
+   present in #6, #7, #9, #10, #11 *before* the deletion commit.
+4. **A fresh worktree with unignored scratch** — closed, and the check had to be strengthened
+   to prove it rather than appear to.
+5. **A stale memory slug** — closed. Two memories deleted by slug, not edited in place; 6
+   files, 6 index lines, bidirectional.
+
+### The owner's gate
+
+`DESIGN.md`'s translation was read and approved by the owner on **2026-10-18**, via the
+clause-by-clause correspondence table in `tmp/design-fr-en.md`, after being shown the three
+calls most worth contesting (Yellow vs Amber, the Mechanicus sentence, the translated labels
+for unbuilt UI).
+
+### Branch review and the fix pass
+
+An independent whole-branch review ran on the most capable model after the last task. It
+re-ran every mechanical check rather than trusting them, and found two published statements
+that were false — the `README.md` language rule narrowed to astropath's version, and a
+warning count that did not reproduce — plus three places where the French-literal rule was
+sharpened in the document but never propagated to the checks describing it. All fixed in one
+pass; the rulings are in the ledger. One minor finding deferred: `DESIGN.md`'s
+"The latter **mutate**" would read less ambiguously as "Both of these mutate".

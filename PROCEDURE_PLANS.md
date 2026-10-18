@@ -107,10 +107,12 @@ just ci          # all three in a row
 
 > **The `lint` gate is currently blind.** `qmllint` runs with no `-I` import path, so it
 > fails at `import QtQuick`, cascades into unresolved-type noise, and **still exits 0** —
-> `just ci` stays green whatever the QML does. Tracked with its measurements in **issue #6**
-> (measured 2026-10-18 on `main` @ `900c54b`: 721 warning lines, 6 `Failed to import`, exit
-> 0). Until it is fixed, a green `just ci` proves `fmt-check` and `test`, and nothing about
-> QML.
+> `just ci` stays green whatever the QML does. Tracked with its measurements in **issue #6**.
+> Measured 2026-10-18, `src/` identical to `main` @ `900c54b`, with
+> `nix develop --command just lint 2>&1 | grep -c Warning`: **717** warning lines, of which
+> **4** are `Failed to import` (`QtQuick`, `qs.Common`, `qs.Widgets`, `qs.Modules.Plugins` —
+> note that `Quickshell.Io` and `QtQuick.Layouts` do resolve), and the recipe still exits 0.
+> Until it is fixed, a green `just ci` proves `fmt-check` and `test`, and nothing about QML.
 
 ## 5. Determinism — goldens on the data layer
 
@@ -158,7 +160,7 @@ surfaced. Pushing that boundary back is work the backlog tracks, not a standing 
 ## 7. What is automated, and what is not
 
 **Automated**: parsing `nix flake metadata` → direct inputs, parsing a compare → `behind`,
-joining input↔lag, `behindCount`, `barState`, `parseNvdDiff`, severity, URL and argv
+joining input↔`behind`, `behindCount`, `barState`, `parseNvdDiff`, severity, URL and argv
 construction. That is the whole `query` + `model` layer, and §5 is how it is tested. A change
 there with no fixture and no golden is incomplete, not merely untested.
 

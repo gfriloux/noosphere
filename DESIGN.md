@@ -210,9 +210,19 @@ the design handoff (`tmp/design_handoff_noosphere/Noosphere.dc.html`, not commit
 > freedom: the **font** — the shell's system font for text, the shell's mono (JetBrains Mono
 > / Fira Code) for everything marked mono.
 
-> **On the French strings quoted in this section.** The UI copy is French **today**, and the
-> literals quoted below are the exact strings currently rendered by `src/`. They are quoted,
-> not translated, so this document keeps describing the interface that actually exists.
+> **On the French strings this document quotes.** The UI copy is French **today**. Every
+> French literal in guillemets — in this section and in §2 `model` above — is a string `src/`
+> renders now, shown with `<placeholders>` and with `N`/`M`/`A`/`R` standing where the code
+> interpolates: the code holds `"lock "`, `" commits en retard"`, `"· Δ "` and so on, not the
+> whole phrase. They are quoted, not translated, so this document keeps describing the
+> interface that actually exists.
+>
+> **One exception, below:** the Adeptus Mechanicus section's « dérive », « amont », « verrou »
+> are named as the project's **vocabulary**, not as rendered copy. Of the three only « amont »
+> reaches the screen; the other two live in code comments, which are themselves bound for
+> English. The rule, stated once: a French string stays French here when it is a **rendered**
+> UI literal — a word appearing only in a comment is not one.
+>
 > English is noosphere's default language and the UI will follow, with EN/FR
 > internationalisation, under its own plan — see `PROCEDURE_PLANS.md`. Until then, a French
 > literal here is deliberate, not a missed translation.

@@ -73,8 +73,9 @@ The `Justfile` is the **only** definition of the gates; pre-commit and CI call i
 ## Guardrails (what does not change)
 
 - **DESIGN.md is authoritative.** Outside the invariants → no. Local flake + GitHub as the
-  source of truth, **read-only (v1)**, **the input is the unit**, lag measured against GitHub
-  upstream (`ahead_by`), **flake-agnostic** (path + owner/repo + branch + token): hard
+  source of truth, **read-only (v1)**, **the input is the unit**, how far **behind** measured
+  against GitHub upstream (`ahead_by`), **flake-agnostic** (path + owner/repo + branch +
+  token): hard
   invariants. Moving to writes (`nix flake update`, `nixos-rebuild`, `rollback`) = an
   explicit DESIGN decision + a dedicated plan, never a quiet addition.
 - **The GitHub token is a secret.** It lives in the config / the `Noosphere.qml` service,

@@ -279,10 +279,17 @@ comment is worth writing at all.
 table, its visual system and its structure are preserved; only the language changes. Two
 consequences the builder must honour:
 
-- **The classification rule is mechanical: a quoted string that appears verbatim in `src/`
-  stays a French literal; everything else is prose and translates.** *(My call. It is the
-  only rule that can be checked rather than judged, and it follows from why the exception
-  exists at all — `DESIGN.md` must describe the UI that is actually there.)*
+- **The classification rule: a quoted string that `src/` actually renders stays a French
+  literal; everything else is prose and translates.** *(My call. It follows from why the
+  exception exists at all — `DESIGN.md` must describe the UI that is actually there.)*
+
+  **Sharpened during execution, after it bit once.** The rule first read "appears verbatim in
+  `src/`", which is wrong in two directions and both were measured: `dérive` and `verrou`
+  appear in `src/` **only inside French code comments** — which are themselves bound for
+  English under chantier 3, so a comment is no evidence of a rendered label — and half the
+  literals are **templates** that no whole-string grep can match (`« lock <age> »` is
+  `"lock "` in the code). The operative rule is **rendered UI literal**, tested on the
+  literal's invariant fragment.
 
   Stays French, verified present in `src/`: «&nbsp;N commits en retard&nbsp;»
   (`src/model/format.js`), «&nbsp;INPUTS&nbsp;» (`src/view/Cockpit.qml`),
@@ -514,15 +521,21 @@ This work ships documents, `.gitignore`, GitHub issues and memory files. No `src
 - `git check-ignore -v .superpowers/sdd/x`, run from a **freshly created worktree**, reports
   the root `.gitignore` as the matching rule. This is the check that proves the scratch leak
   is closed where it would actually leak.
-- `grep -rniE 'jamais|toujours|le token|la couche|dérive|plan validé' DESIGN.md
-  PROCEDURE_PLANS.md CLAUDE.md` returns nothing. This is the mechanical check against a
-  half-translated document, and the classification rule above is what makes its expected
-  output empty rather than a judgement call.
-- Every French string still quoted in `DESIGN.md` is verified present in `src/`: for each
-  one, `grep -rF '<string>' src/` must hit. A quoted French string with no hit in `src/`
-  means either an untranslated fragment or a `DESIGN.md` that describes copy which does not
-  exist — both are defects, and this check cannot tell them apart, which is why it fails
-  rather than warns.
+- French **prose** check: `sed 's/«[^»]*»//g'` over `DESIGN.md`, `PROCEDURE_PLANS.md` and
+  `CLAUDE.md`, then `grep -niE 'jamais|toujours|le token|la couche|dérive|plan validé'`,
+  returns nothing. The `«…»` spans are stripped first because a deliberate French literal
+  legitimately contains a word from the pattern — without the strip, the check fails on
+  correct content, which is worse than not running it.
+- Every French string quoted in `DESIGN.md` has its **invariant fragment** verified present
+  in `src/`: strip `<…>` placeholders and the `N`/`M`/`A`/`R` count variables, then
+  `grep -rF '<fragment>' src/` must hit. The strip is not optional: roughly half the literals
+  are templates (`« lock <age> »` is `"lock "` in the code), so a whole-string `grep -rF`
+  cannot hit by construction and would mark real rendered literals as defects — whose obvious
+  "fix" is to translate them, an anti-goal of this design. A fragment that does not hit means
+  either an untranslated fragment or a `DESIGN.md` describing copy that does not exist — both
+  are defects, and this check cannot tell them apart, which is why it fails rather than warns.
+  Documented exception: the Adeptus vocabulary terms, which are named as vocabulary and hit
+  only in code comments.
 - `DESIGN.md`'s invariants are still eleven, still in the same order, and the colour table
   still holds the same hex values. A translation that renumbers or drops an invariant is a
   revision, and a revision was a non-goal.
