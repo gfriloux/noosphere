@@ -30,6 +30,13 @@ if [ ! -f "$src/plugin.json" ] || [ ! -d "$src/src" ]; then
 fi
 command -v dms >/dev/null || { echo "noosphere-dev : 'dms' introuvable sur le PATH." >&2; exit 1; }
 command -v jq  >/dev/null || { echo "noosphere-dev : 'jq' introuvable sur le PATH." >&2; exit 1; }
+command -v quickshell >/dev/null || { echo "noosphere-dev : 'quickshell' introuvable (entrer dans le dev shell : nix develop)." >&2; exit 1; }
+
+# DMS shell root, resolved through the installed binary — no store hash pinned.
+# Same resolution as scripts/qml-import-paths.
+dms_bin="$(readlink -f "$(command -v dms)")"
+dms_shell="${dms_bin%/bin/dms}/share/quickshell/dms"
+[ -d "$dms_shell" ] || { echo "noosphere-dev : racine du shell DMS introuvable ($dms_shell)." >&2; exit 1; }
 
 root="${XDG_STATE_HOME:-$HOME/.local/state}/noosphere-dev"
 export XDG_CONFIG_HOME="$root/config"
@@ -52,5 +59,14 @@ echo "  → active 'Noosphere (dev)' dans CETTE instance (Settings → Plugins).
 echo "  → règle l'endpoint GitHub du plugin sur http://127.0.0.1:8385 (avec 'just mock')."
 echo "  (Ctrl-C pour arrêter l'instance dev.)"
 
-# `dms run` = `qs -c dms` : sans la sous-commande `run`, dms n'affiche que son usage.
-exec dms run "$@"
+# Launch the UI through `quickshell` directly, not through `dms run`.
+#
+# Why: since DMS 1.6, `dms run` starts a Go *backend* and refuses a second one for the same
+# session ("dms already running for this session; refusing to start a second instance").
+# The guard is right — one backend per session — but it made a dev instance impossible to
+# start whenever the everyday bar was running, which is always.
+#
+# The UI itself is an ordinary Quickshell shell, so open it on the DMS shell root with our
+# isolated XDG dirs, keeping the plugin directory and the qmlcache separate. The already
+# running backend serves both UIs. Accepted consequence: two bars on screen during a test.
+exec quickshell -p "$dms_shell" "$@"

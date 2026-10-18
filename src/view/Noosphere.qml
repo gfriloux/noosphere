@@ -2,13 +2,16 @@
 // GitHub (compare) pour chaque input, assemble le modèle de dérive et poll périodiquement.
 // Lecture seule : aucun `nix flake update`, aucun `nixos-rebuild`.
 //
-// Pipeline d'un poll :
-//   1. nix flake metadata --json <path>  → parseMetadata → inputs directs
-//   2. pour chaque input github, séquentiellement :
-//        head = channel, sinon default_branch (GET repo) ;
-//        GET compare/<lockRev>...<head> → parseCompare → behind
-//   3. mergeBehind → inputs annotés, barState/behindCount, lastCheck
-//   4. (best-effort, en parallèle) readlink + stat du profil système → génération courante
+// Depuis v0.4.0 ce fichier ne décide plus rien : la machine à états du poll vit dans
+// `src/model/poll.js`, pure et testée par `tests/tst_poll.qml`. Ce qui reste ici est l'I/O
+// que le driver ne peut pas porter — les `Process`, les `XMLHttpRequest`, les `Timer` — plus
+// la publication du modèle. Le driver rend un **effet** (`get` / `commit` / `fail` / `noop`)
+// et `_perform()` l'exécute.
+//
+// Pourquoi ce découpage : un QML qui importe `Quickshell.Io` ne peut pas être chargé par
+// `qmltestrunner` (les types de Quickshell vivent dans le binaire, pas dans une bibliothèque
+// de plugin), et sous le binaire `quickshell` les assertions de QtTest n'échouent jamais.
+// Tant que le driver vivait ici, aucun test ne pouvait le couvrir.
 //
 // Les appels GitHub partent du processus lui-même (XMLHttpRequest), jamais d'un `curl`
 // externe : le token, passé en header `Authorization: Bearer`, ne traverse ainsi aucun argv.
@@ -17,6 +20,7 @@ import QtQuick
 import Quickshell.Io
 import "../query/queries.js" as Queries
 import "../model/inputs.js" as Model
+import "../model/poll.js" as Poll
 
 QtObject {
     id: root
@@ -41,24 +45,16 @@ QtObject {
 
     readonly property bool configured: flakePath.length > 0
 
-    // --- État interne du driver séquentiel ---
-    //
-    // Contrat : **une étape = une requête = une avance**. L'input est porté par la closure de
-    // sa requête : une réponse ne peut pas être attribuée au voisin (qui afficherait alors un
-    // retard sans head : invisible pour l'aperçu de closure et le lien changelog). Et une
-    // requête abandonnée ne rappelle jamais — `_abortPending()` la clôt avant `abort()` —
-    // donc une étape ne peut pas avancer deux fois.
-    //
-    // Ce rattachement était auparavant gardé par un état partagé (`_await` / `_current`),
-    // rendu nécessaire par deux `Process` `curl` réutilisés pour N inputs. Émettre une
-    // requête par objet le rend structurel : il n'y a plus rien à garder.
-    property var _inputs: [] // inputs bruts (parseMetadata), avant retard
-    property var _behind: ({}) // accumulateur name → behind
-    property var _heads: ({}) // accumulateur name → head amont résolu (pour le lien changelog)
-    property var _queue: [] // inputs github à comparer
-    property int _cursor: 0
+    // --- État ---
+    property var _st: null // état du driver (src/model/poll.js)
     property bool _busy: false
     property var _pending: null // requête HTTP en vol (une seule à la fois) : { xhr, timedOut, settled }
+
+    // Transport factory. The one substitution point left in this file: production returns
+    // a real `XMLHttpRequest`, a test can return a fake.
+    property var xhrFactory: function () {
+        return new XMLHttpRequest();
+    }
 
     // (Re)poll quand un réglage pertinent change.
     function reconfigure() {
@@ -79,6 +75,9 @@ QtObject {
             return;
         root._busy = true;
         root.connectionStatus = "polling";
+        root._st = Poll.create({
+            "apiBase": root.apiBase
+        });
         stepWatchdog.restart();
         metaProc.command = ["nix"].concat(Queries.flakeMetadata(root.flakePath));
         metaProc.running = true;
@@ -87,25 +86,74 @@ QtObject {
         genTimeProc.running = true;
     }
 
+    // Performs an effect returned by the driver. The only place a driver decision becomes
+    // an action.
+    function _perform(eff) {
+        if (!eff)
+            return;
+        if (eff.kind === "noop")
+            return;
+        if (eff.kind === "get") {
+            stepWatchdog.restart();
+            var tok = eff.token;
+            root._ghGet(eff.url, function (status, text, timedOut) {
+                root._perform(Poll.onHttpDone(root._st, tok, status, text, timedOut));
+            });
+            return;
+        }
+        if (eff.kind === "commit") {
+            root._publish();
+            return;
+        }
+        if (eff.kind === "fail") {
+            root._failWith(eff.message);
+            return;
+        }
+    }
+
+    // Publishes the poll's model. The status comes from `Poll.commitStatus()`, not from
+    // here: a poll that could verify **nothing** still publishes the freshly read list
+    // (`nix flake metadata` succeeded, only the GitHub half failed) but under an error
+    // status, and without touching `lastCheck`. The badge then greys — `stateColor` derives
+    // from `connectionStatus === "error"` — instead of announcing "up to date" unverified.
+    function _publish() {
+        stepWatchdog.stop();
+        var m = Poll.model(root._st);
+        root.inputs = m.inputs;
+        root.behindCount = m.behindCount;
+        root.upToDateCount = m.upToDateCount;
+        root.barState = m.barState;
+        var cs = Poll.commitStatus(root._st);
+        root.connectionStatus = cs.connectionStatus;
+        root.errorMessage = cs.errorMessage;
+        if (cs.touchLastCheck)
+            root.lastCheck = Date.now() / 1000;
+        root._busy = false;
+    }
+
+    // Best-effort : conserve le dernier état connu (DESIGN inv. 7). Clôt l'étape en cours pour
+    // qu'une réponse tardive ne vienne pas s'appliquer au poll suivant.
+    function _failWith(msg) {
+        stepWatchdog.stop();
+        root._abortPending();
+        root.connectionStatus = "error";
+        root.errorMessage = msg;
+        root._busy = false;
+    }
+
     // Chien de garde d'étape. Une requête HTTP a son propre délai (`httpTimeout`), mais rien
     // ne garantit qu'un signal nous parvienne (`nix` qui s'éternise, flux jamais clos, rappel
-    // perdu). Sans ce filet, un poll n'atteindrait ni `_commit()` ni `_fail()` : `_busy` resterait vrai et
-    // « check maintenant » serait muet **définitivement**. Une étape perdue laisse simplement
-    // son input en retard indéterminé, on passe au suivant.
+    // perdu). Sans ce filet, un poll n'atteindrait ni `commit` ni `fail` : `_busy` resterait
+    // vrai et « check maintenant » serait muet **définitivement**. Le driver décide quoi faire
+    // d'une étape perdue ; ici on abandonne seulement la requête en vol.
     property Timer stepWatchdog: Timer {
         interval: 60000
         repeat: false
         onTriggered: {
             if (!root._busy)
                 return;
-            // Une requête en vol = on est dans une étape HTTP : on la déclare perdue et on
-            // passe au suivant. Sinon l'étape bloquée est `nix`, et le poll entier échoue.
-            if (root._pending) {
-                root._abortPending();
-                root._advance();
-            } else {
-                root._fail("check interrompu (délai dépassé)");
-            }
+            root._abortPending();
+            root._perform(Poll.onWatchdog(root._st));
         }
     }
 
@@ -134,7 +182,7 @@ QtObject {
     // distingue notre propre abandon d'une panne réseau : les deux rendent `status === 0`.
     function _ghGet(url, onDone) {
         root._abortPending(); // invariant : une seule requête vivante à la fois
-        var xhr = new XMLHttpRequest();
+        var xhr = root.xhrFactory();
         var state = {
             xhr: xhr,
             timedOut: false,
@@ -176,125 +224,9 @@ QtObject {
         xhr.send();
     }
 
-    // 1er étage : nix flake metadata.
-    property Process metaProc: Process {
-        running: false
-        stdout: StdioCollector {
-            onStreamFinished: root._onMeta(text)
-        }
-        stderr: StdioCollector {
-            onStreamFinished: if (text.trim())
-                console.warn("noosphere nix:", text.trim())
-        }
-        onExited: code => {
-            if (code !== 0 && root._busy)
-                root._fail("flake illisible (nix " + code + ")");
-        }
-    }
-
-    function _onMeta(text) {
-        if (!text || !text.trim())
-            return; // échec → onExited
-        var meta = root._parse(text);
-        if (meta === null) {
-            // `nix` a rendu 0 mais du non-JSON : sans issue explicite le poll resterait en vol.
-            root._fail("métadonnées du flake illisibles");
-            return;
-        }
-        root._inputs = Model.parseMetadata(meta);
-        root._behind = {};
-        root._heads = {};
-        // File des inputs github (les autres types sont affichés, jamais comparés).
-        var q = [];
-        for (var i = 0; i < root._inputs.length; i++)
-            if (root._inputs[i].type === "github" && root._inputs[i].owner && root._inputs[i].repoName)
-                q.push(root._inputs[i]);
-        root._queue = q;
-        root._cursor = 0;
-        root._next();
-    }
-
-    // ---- Driver séquentiel des compare ----
-
-    function _next() {
-        if (root._cursor >= root._queue.length) {
-            root._commit();
-            return;
-        }
-        var it = root._queue[root._cursor];
-        if (it.channel) {
-            root._compare(it, it.channel);
-            return;
-        }
-        // Pas de ref suivie → résoudre la branche par défaut du repo d'abord.
-        stepWatchdog.restart();
-        root._ghGet(Queries.repoApiUrl(root.apiBase, it.owner, it.repoName), function (status, text, timedOut) {
-            var err = Model.githubError(status, text, timedOut);
-            if (err && err.fatal) {
-                root._fail(err.message); // vaut pour toutes les requêtes suivantes
-                return;
-            }
-            var res = err ? null : root._parse(text);
-            // La réponse doit désigner le dépôt interrogé, sinon elle vient d'ailleurs.
-            var head = Model.repoBelongsTo(res, it.owner, it.repoName) ? Model.parseDefaultBranch(res) : "";
-            if (head)
-                root._compare(it, head);
-            else
-                root._advance(); // non résolu → behind reste indéterminé
-        });
-    }
-
-    function _compare(it, head) {
-        root._heads[it.name] = head; // mémorisé pour le lien changelog de la vue
-        stepWatchdog.restart();
-        root._ghGet(Queries.compareApiUrl(root.apiBase, it.owner, it.repoName, it.lockRev, head), function (status, text, timedOut) {
-            var err = Model.githubError(status, text, timedOut);
-            if (err && err.fatal) {
-                root._fail(err.message);
-                return;
-            }
-            var res = err ? null : root._parse(text);
-            // La réponse doit porter sur la révision verrouillée de CET input.
-            if (Model.compareBelongsTo(res, it.lockRev)) {
-                var b = Model.parseCompare(res);
-                if (typeof b === "number")
-                    root._behind[it.name] = b;
-            }
-            root._advance();
-        });
-    }
-
-    function _advance() {
-        root._cursor += 1;
-        root._next();
-    }
-
-    // ---- Aboutissement ----
-
-    function _commit() {
-        stepWatchdog.stop();
-        var list = Model.mergeBehind(root._inputs, root._behind);
-        // Enrichit chaque input du head amont résolu (channel ou branche par défaut) : sert
-        // au lien changelog de la vue. Hors modèle golden (dépend de la résolution réseau).
-        var heads = root._heads;
-        list = list.map(function (it) {
-            it.head = heads[it.name] || it.channel || "";
-            return it;
-        });
-        root.inputs = list;
-        root.behindCount = Model.behindCount(list);
-        root.upToDateCount = Model.upToDateCount(list);
-        root.barState = Model.barState(list, false);
-        root.connectionStatus = "live";
-        root.errorMessage = "";
-        root.lastCheck = Date.now() / 1000;
-        root._busy = false;
-    }
-
     // Abandonne la requête en vol, s'il y en a une. Elle est marquée close **avant** `abort()`
-    // pour que son rappel ne parte pas : c'est ce qui garantit qu'une réponse tardive ne fera
-    // jamais avancer l'étape suivante. Sans cela, `httpTimeout` viendrait de surcroît
-    // interrompre la requête d'après.
+    // pour que son rappel ne parte pas. Le driver garde par ailleurs son propre jeton, donc
+    // une réponse tardive ne peut de toute façon pas faire avancer une étape.
     function _abortPending() {
         var p = root._pending;
         root._pending = null;
@@ -305,22 +237,36 @@ QtObject {
         }
     }
 
-    // Best-effort : conserve le dernier état connu (DESIGN inv. 7). Clôt l'étape en cours pour
-    // qu'une réponse tardive ne vienne pas s'appliquer au poll suivant.
-    function _fail(msg) {
-        stepWatchdog.stop();
-        root._abortPending();
-        root.connectionStatus = "error";
-        root.errorMessage = msg;
-        root._busy = false;
-    }
-
-    function _parse(text) {
-        try {
-            return JSON.parse(text);
-        } catch (e) {
-            return null;
+    // 1er étage : nix flake metadata.
+    property Process metaProc: Process {
+        running: false
+        stdout: StdioCollector {
+            onStreamFinished: {
+                // The poll must still be running. Without this guard, a `nix` the watchdog
+                // has already given up on (`_failWith`, so `_busy` false and the status
+                // `error`) can answer afterwards and start a ghost poll: nothing bounds it
+                // any more, and its `_publish()` would clear the error status and stamp
+                // `lastCheck` — exactly what #7's fix exists to prevent.
+                if (!root._busy)
+                    return;
+                if (text && text.trim())
+                    root._perform(Poll.begin(root._st, text));
+                // vide → échec, traité par onExited
+            }
         }
+        stderr: StdioCollector {
+            onStreamFinished: if (text.trim())
+                console.warn("noosphere nix:", text.trim())
+        }
+        // qmllint disable signal-handler-parameters
+        // `exited(int, QProcess::ExitStatus)`: the second parameter is a C++ enum Quickshell
+        // does not register for QML, so qmllint cannot resolve it and warns on every such
+        // handler. Remove once upstream exposes ExitStatus in its qmltypes.
+        onExited: code => {
+            if (code !== 0 && root._busy)
+                root._perform(Poll.onMetaFailed(root._st, "flake illisible (nix " + code + ")"));
+        }
+        // qmllint enable signal-handler-parameters
     }
 
     // ---- Génération système courante (lecture seule, best-effort) ----

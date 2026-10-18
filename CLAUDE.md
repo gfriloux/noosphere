@@ -57,10 +57,12 @@ For non-interactive commands: `nix develop --command just ci`.
 ## Commands
 
 ```bash
-just ci          # full gate: fmt-check + lint + test
+just ci          # full gate: fmt-check + check-manifest + test + lint
+just ci-hermetic # all but lint — the subset CI runs (a runner has no DMS)
+just check-manifest # plugin.json against DMS's published schema
 just fmt         # qmlformat -i (formats in place)
 just fmt-check   # checks formatting, fails if non-conforming
-just lint        # qmllint, no warning tolerated — currently blind, see issue #6
+just lint        # qmllint, blocking at zero — needs DMS installed (PROCEDURE_PLANS.md §4)
 just test        # goldens (frozen inputs → model) + Qt Quick Test
 just bless       # regenerates the goldens (review the diff)
 just mock        # GitHub compare mock (scenario: drift | uptodate | ratelimit | error)

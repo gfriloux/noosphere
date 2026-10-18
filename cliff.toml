@@ -1,6 +1,16 @@
-# Configuration git-cliff — changelog depuis les Conventional Commits.
-# Régénérer avec `just changelog` (relire le diff). Groupes en français, alignés sur les
-# types de commits du dépôt (cf. PROCEDURE_PLANS.md §3).
+# git-cliff configuration — changelog from Conventional Commits.
+#
+# `just changelog` **prepends** the section for the version in plugin.json; it does not
+# regenerate the file. That is deliberate: regenerating would re-emit the v0.1.0 … v0.3.0
+# sections — which describe commits written in French — under these English group headers,
+# rewriting the published record. A changelog is append-only history, so the tool is used
+# that way. Groups match the repository's commit types (see PROCEDURE_PLANS.md §3).
+#
+# `header` must stay byte-identical to the preamble at the top of CHANGELOG.md: git-cliff
+# recognises it there and inserts the new section *after* it. With an empty or mismatched
+# header the new section lands above the preamble, leaving the file's own title buried in its
+# middle. (The preamble is boilerplate about the format, so translating it rewrites no record;
+# the version sections below it are never touched.)
 
 [remote.github]
 owner = "gfriloux"
@@ -10,11 +20,11 @@ repo = "noosphere"
 header = """
 # Changelog
 
-Toutes les évolutions notables de noosphere. Format inspiré de [Keep a Changelog],
-versions en [SemVer]. Généré depuis les Conventional Commits par git-cliff.
+Every notable change to noosphere. Format inspired by [Keep a Changelog], versions in
+[SemVer]. Generated from the Conventional Commits by git-cliff.
 
-[Keep a Changelog]: https://keepachangelog.com/fr/1.1.0/
-[SemVer]: https://semver.org/lang/fr/
+[Keep a Changelog]: https://keepachangelog.com/en/1.1.0/
+[SemVer]: https://semver.org/
 
 """
 
@@ -22,20 +32,18 @@ body = """
 {% if version %}\
     ## [{{ version | trim_start_matches(pat="v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}
 {% else %}\
-    ## [Non publié]
+    ## [Unreleased]
 {% endif %}\
 {% for group, commits in commits | group_by(attribute="group") %}
     ### {{ group | striptags | trim | upper_first }}
     {% for commit in commits %}
-        - {% if commit.scope %}**{{ commit.scope }}** : {% endif %}\
+        - {% if commit.scope %}**{{ commit.scope }}**: {% endif %}\
             {{ commit.message | split(pat="\n") | first | upper_first }}\
     {% endfor %}
 {% endfor %}\n
 """
 
-footer = """
-<!-- généré par git-cliff -->
-"""
+footer = ""
 
 trim = true
 
@@ -43,20 +51,23 @@ trim = true
 conventional_commits = true
 filter_unconventional = true
 split_commits = false
-# Ne garde que les commits qui matchent un parser (protège le changelog du bruit).
+# Keep only commits that match a parser (protects the changelog from noise).
 filter_commits = true
 tag_pattern = "v[0-9]*"
 sort_commits = "newest"
 
 commit_parsers = [
-  { message = "^feat", group = "<!-- 0 -->Fonctionnalités" },
-  { message = "^fix", group = "<!-- 1 -->Corrections" },
+  # A release commit is bookkeeping about the changelog, not a change to report in it.
+  { message = "^chore\\(release\\)", skip = true },
+  { message = "^feat", group = "<!-- 0 -->Features" },
+  { message = "^fix", group = "<!-- 1 -->Bug fixes" },
   { message = "^perf", group = "<!-- 2 -->Performance" },
-  { message = "^refactor", group = "<!-- 3 -->Refactorisations" },
+  { message = "^refactor", group = "<!-- 3 -->Refactoring" },
   { message = "^docs", group = "<!-- 4 -->Documentation" },
   { message = "^test", group = "<!-- 5 -->Tests" },
-  { message = "^ci", group = "<!-- 6 -->Intégration continue" },
-  { message = "^chore", group = "<!-- 7 -->Divers" },
+  { message = "^build", group = "<!-- 6 -->Build" },
+  { message = "^ci", group = "<!-- 7 -->Continuous integration" },
+  { message = "^chore", group = "<!-- 8 -->Miscellaneous" },
   { message = "^merge", skip = true },
   { message = ".*", skip = true },
 ]

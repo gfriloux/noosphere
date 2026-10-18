@@ -1,0 +1,105 @@
+#!/usr/bin/env bash
+#
+# Print the QML import paths qmllint needs, one per line, for `just lint`.
+#
+# Why this exists: noosphere's QML imports QtQuick, Quickshell.Io and three of
+# DankMaterialShell's `qs.*` modules. With no import path, qmllint fails at every one of
+# them and cascades into hundreds of unresolved-type warnings — while still exiting 0.
+#
+# Why it is not just a list of `-I` flags: DMS ships **no qmldir**. Its `qs.Common`,
+# `qs.Widgets` and `qs.Modules.Plugins` are plain directories of .qml files that Quickshell
+# resolves at runtime by synthesising the module metadata as it starts. qmllint needs a
+# qmldir, so pointing `-I` at the DMS root resolves nothing.
+#
+# The upstream mechanism is to let Quickshell generate it: an empty `.qmlls.ini` in a shell
+# root gets populated with `buildDir` (a VFS holding the synthesized qmldirs) and
+# `importPaths`. DMS's own AGENTS.md names this as the prerequisite for its `make lint-qml`,
+# and caelestia-dots/shell does the same in CI.
+#
+# Three measured facts this script is shaped around:
+#
+#   * The VFS's .qml entries are **symlinks back into the shell root** it was generated
+#     from. So the root cannot be a temp directory deleted on exit — it must outlive the
+#     qmllint run. Hence a stable cache directory, reused across runs.
+#   * `quickshell -p` never exits on its own and returns **255** when killed, while still
+#     having written a complete VFS. Its exit code says nothing; the populated ini does.
+#   * `buildDir` lives on tmpfs, so it vanishes on reboot while the cache survives. The
+#     script notices and regenerates.
+#
+# Exits non-zero, with a message on stderr and nothing on stdout, when DMS or quickshell
+# cannot be found. A partial list would make the lint gate silently check less.
+
+set -uo pipefail
+
+die() {
+    printf 'qml-import-paths: %s\n' "$*" >&2
+    exit 1
+}
+
+# --- Locate DankMaterialShell through the installed binary -------------------------------
+#
+# Resolving `dms` on PATH rather than globbing /nix/store: no store hash is pinned, and the
+# version found is the one the user actually runs.
+
+command -v dms >/dev/null 2>&1 || die \
+    "DankMaterialShell not found: no 'dms' on PATH. The QML lint needs DMS installed,
+                   because noosphere imports its qs.* modules. Install it (home-manager:
+                   programs.dankMaterialShell.enable) or run the lint on a machine that has it."
+
+dms_bin="$(readlink -f "$(command -v dms)")" || die "cannot resolve the 'dms' binary"
+dms_root="${dms_bin%/bin/dms}/share/quickshell/dms"
+[ -d "$dms_root" ] || die "DMS shell root not found at $dms_root (resolved from $dms_bin)"
+
+command -v quickshell >/dev/null 2>&1 || die \
+    "quickshell not found — enter the dev shell first: nix develop"
+qs_bin="$(readlink -f "$(command -v quickshell)")" || die "cannot resolve the quickshell binary"
+
+# --- Stable cache -----------------------------------------------------------------------
+
+cache="${XDG_CACHE_HOME:-$HOME/.cache}/noosphere/qml-lint"
+shell_root="$cache/shell"
+stamp="$cache/source-key"
+ini="$shell_root/.qmlls.ini"
+
+# The cache key covers DMS *and* quickshell, because the generated .qmlls.ini bakes in the
+# store paths of Qt and Quickshell as well as DMS's modules. Keying on DMS alone meant a
+# `nix flake update` that bumped nixpkgs or quickshell left the gate linting against the
+# previous Qt — an API the plugin no longer runs on — for as long as those paths survived
+# garbage collection, and then failing confusingly once they did not.
+cache_key="$dms_root
+$qs_bin"
+
+generate() {
+    rm -rf "$shell_root"
+    mkdir -p "$cache"
+    cp -r "$dms_root" "$shell_root" || die "cannot copy the DMS shell root into $cache"
+    chmod -R u+w "$shell_root"
+    : >"$ini"
+    # Quickshell populates the ini and writes the VFS. Its exit code is meaningless here.
+    QT_QPA_PLATFORM=offscreen timeout 30 quickshell -p "$shell_root" >/dev/null 2>&1
+    grep -q '^importPaths=' "$ini" 2>/dev/null ||
+        die "quickshell did not populate $ini — cannot determine the import paths"
+    printf '%s\n' "$cache_key" >"$stamp"
+}
+
+read_build_dir() {
+    sed -n 's/^buildDir="\(.*\)"$/\1/p' "$ini" 2>/dev/null
+}
+
+# Regenerate when the cache is absent, when DMS or quickshell has been updated (either store
+# path moved), or when the VFS is gone (tmpfs cleared by a reboot).
+if [ ! -f "$ini" ] || [ ! -f "$stamp" ] || [ "$(cat "$stamp" 2>/dev/null)" != "$cache_key" ]; then
+    generate
+elif [ ! -d "$(read_build_dir)" ]; then
+    generate
+fi
+
+build_dir="$(read_build_dir)"
+[ -d "$build_dir" ] || die "the generated VFS is missing at '$build_dir' even after regenerating"
+
+# --- Emit -------------------------------------------------------------------------------
+
+printf '%s\n' "$build_dir"
+sed -n 's/^importPaths="\(.*\)"$/\1/p' "$ini" | tr ':' '\n' | while IFS= read -r p; do
+    [ -n "$p" ] && printf '%s\n' "$p"
+done

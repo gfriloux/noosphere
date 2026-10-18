@@ -6,6 +6,12 @@
 //
 // Découplé de NoosphereWidget : reçoit le service (`service`) et le composant racine
 // (`owner`). Ne construit ni n'exécute jamais de commande.
+//
+// `ComponentBehavior: Bound`: the Repeater's delegate already declares
+// `required property var modelData`, so the pragma changes nothing for it — it only makes
+// the capture of the `cockpit` id from inside the delegate explicit.
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import QtQuick.Layouts
 import qs.Common
@@ -297,8 +303,11 @@ PopoutComponent {
 
                                 Rectangle {
                                     Layout.alignment: Qt.AlignVCenter
-                                    width: 7
-                                    height: 7
+                                    // A layout-managed item sizes itself through its implicit
+                                    // size; setting width/height directly is undefined
+                                    // behaviour per Qt.
+                                    implicitWidth: 7
+                                    implicitHeight: 7
                                     radius: 3.5
                                     color: Format.inputDotColor(row.modelData.behind)
                                 }
@@ -313,8 +322,8 @@ PopoutComponent {
                                 Rectangle {
                                     visible: row.modelData.channel.length > 0
                                     Layout.alignment: Qt.AlignVCenter
-                                    height: 16
-                                    width: chanText.implicitWidth + 12
+                                    implicitHeight: 16
+                                    implicitWidth: chanText.implicitWidth + 12
                                     radius: 6
                                     color: "#1e1e2e"
 
@@ -342,8 +351,8 @@ PopoutComponent {
                                     visible: row.behindPositive && row.changelogUrl.length > 0
                                     opacity: rowHover.hovered ? 1 : 0
                                     Layout.alignment: Qt.AlignVCenter
-                                    height: 20
-                                    width: clText.implicitWidth + 16
+                                    implicitHeight: 20
+                                    implicitWidth: clText.implicitWidth + 16
                                     radius: 7
                                     color: clArea.containsMouse ? "#313244" : "#1e1e2e"
                                     border.width: 1

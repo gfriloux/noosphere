@@ -27,5 +27,13 @@ jobs:
           extra_nix_config: |
             experimental-features = nix-command flakes
 
-      - name: just ci (fmt-check + lint + test)
-        run: nix develop --command just ci
+      - name: What this run does not check
+        run: |
+          echo "::notice title=QML not linted here::DankMaterialShell is not available on a"\
+               "GitHub runner, and qmllint cannot resolve its qs.* modules without it, so the"\
+               "QML lint does not run in CI. It runs locally and in pre-commit, where DMS is"\
+               "installed — see PROCEDURE_PLANS.md section 4. A green run here proves"\
+               "fmt-check, the manifest check and the tests, and nothing about QML."
+
+      - name: just ci-hermetic (fmt-check + check-manifest + test)
+        run: nix develop --command just ci-hermetic

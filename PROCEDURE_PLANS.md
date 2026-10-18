@@ -99,20 +99,27 @@ document **redefines** the gates — a list elsewhere (here, `CLAUDE.md`, `READM
 convenience copy of the `Justfile`, never a second source.
 
 ```bash
-just fmt-check   # qmlformat — no unformatted file
-just lint        # qmllint — no warning tolerated
-just test        # goldens (frozen inputs → model) + Qt Quick Test
-just ci          # all three in a row
+just fmt-check       # qmlformat — no unformatted file
+just check-manifest  # plugin.json against DMS's published schema (vendored)
+just test            # goldens (frozen inputs → model) + Qt Quick Test
+just lint            # qmllint — blocks at zero; needs DMS installed
+just ci              # all four
+just ci-hermetic     # all but lint: the subset CI can run (no DMS on a runner)
 ```
 
-> **The `lint` gate is currently blind.** `qmllint` runs with no `-I` import path, so it
-> fails at `import QtQuick`, cascades into unresolved-type noise, and **still exits 0** —
-> `just ci` stays green whatever the QML does. Tracked with its measurements in **issue #6**.
-> Measured 2026-10-18, `src/` identical to `main` @ `900c54b`, with
-> `nix develop --command just lint 2>&1 | grep -c Warning`: **717** warning lines, of which
-> **4** are `Failed to import` (`QtQuick`, `qs.Common`, `qs.Widgets`, `qs.Modules.Plugins` —
-> note that `Quickshell.Io` and `QtQuick.Layouts` do resolve), and the recipe still exits 0.
-> Until it is fixed, a green `just ci` proves `fmt-check` and `test`, and nothing about QML.
+> **`lint` needs DankMaterialShell installed, and blocks at zero.** `qmllint` cannot resolve
+> DMS's `qs.*` modules from an `-I` flag — DMS ships no `qmldir`, and Quickshell synthesises
+> the module metadata as it starts. So `scripts/qml-import-paths` has Quickshell generate it
+> (an empty `.qmlls.ini` in a cached copy of the DMS shell root, populated by a short `qs`
+> run) and feeds the result in. Consequences:
+>
+> - **Without DMS on `PATH`, `just lint` fails** rather than linting a subset quietly.
+> - **`qmllint` exits 0 whatever it finds**, so the recipe judges its *output*: any
+>   `Warning:`/`Error:`/`Info:` line that is not one of two known-bogus classes fails the
+>   gate. Those two filters are commented at the call site with what would let them go.
+> - **CI does not run this leg** — it has no DMS — and says so in its own output. A green CI
+>   run proves `fmt-check`, `test` and the manifest check, and nothing about QML. The QML gate
+>   lives on the developer's machine and in `pre-commit`.
 
 ## 5. Determinism — goldens on the data layer
 

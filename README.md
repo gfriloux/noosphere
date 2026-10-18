@@ -28,11 +28,21 @@ Spirit and invariants: [`DESIGN.md`](./DESIGN.md). Working method:
 
 ## Status
 
-**v0.3.0 — drift + closure diff, GitHub queried in-process.** noosphere is **installable
-and usable**. The **bar badge** encodes the drift state (blue = up to date, yellow + dot = N
-inputs behind, grey = failed check), rosette glyph. Since v0.3.0 the GitHub compare calls
-are issued by the service itself through `XMLHttpRequest` rather than an external `curl`
-process, so the token never reaches a command line. The **cockpit popout** provides:
+**v0.4.0 — gates that guard, and a badge that no longer overstates.** noosphere is
+**installable and usable**. The **bar badge** encodes the drift state (blue = up to date,
+yellow + dot = N inputs behind, grey = failed or unverified check), rosette glyph. Since
+v0.3.0 the GitHub compare calls are issued by the service itself through `XMLHttpRequest`
+rather than an external `curl` process, so the token never reaches a command line.
+
+v0.4.0 is a quality release. The `lint` gate stopped being decorative: `qmllint` now resolves
+every import through Quickshell's own generated VFS and blocks at zero findings. The
+sequential poll driver moved out of QML into `src/model/poll.js`, pure and covered by
+scenario tests — the layer where this project's bugs had appeared was the one layer no test
+could reach. And a poll that could verify **nothing** no longer reports "up to date": it
+keeps an error status, greys the badge, and leaves the last-check timestamp alone. CI gained
+a `plugin.json` check and now states, in its own output, that it does not lint QML.
+
+The **cockpit popout** provides:
 - a **header** card (flake identity, branch, current system generation, last check);
 - an **INPUTS** card (one row per direct input: state dot, channel, lock age, drift against
   upstream, **changelog** link when hovering a row that is behind);
@@ -58,14 +68,17 @@ nix develop
 just ci        # full gate: fmt-check + lint + test
 ```
 
-> **The `lint` leg currently guards nothing.** `qmllint` runs with no `-I` import path, so it
-> fails at `import QtQuick`, cascades into unresolved-type noise, and still exits 0 — 717
-> warning lines on a green run. A green `just ci` proves `fmt-check` and `test`, and nothing
-> about QML. Tracked in [issue #6](https://github.com/gfriloux/noosphere/issues/6).
+> **The `lint` leg needs DankMaterialShell installed.** `qmllint` cannot resolve DMS's `qs.*`
+> modules on its own, so `scripts/qml-import-paths` has Quickshell generate the import paths
+> and feeds them in; without DMS the recipe fails rather than linting less. The gate blocks at
+> zero findings. **CI does not run it** — no DMS there — and prints a line saying so, so a
+> green CI run never implies the QML was checked.
 
 Other targets: `just test` (golden + Qt Quick Test), `just fmt` (formats the QML),
-`just bless` (regenerates the goldens — read the diff), `just changelog` (regenerates
-`CHANGELOG.md` through git-cliff). To try it visually without network or server:
+`just bless` (regenerates the goldens — read the diff), `just check-manifest` (`plugin.json`
+against DMS's published schema), `just changelog` (**prepends** the section for the version
+in `plugin.json`; it does not regenerate, so the published French sections survive). To try
+it visually without network or server:
 
 ```bash
 just mock       # mock of the GitHub compare API (drift | uptodate | ratelimit | error)

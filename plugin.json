@@ -2,13 +2,23 @@
   "id": "noosphere",
   "name": "Noosphere",
   "description": "Suivi de dérive de flake NixOS — badge d'état et cockpit des inputs en retard",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "author": "gfriloux",
   "type": "widget",
-  "capabilities": ["dankbar-widget"],
+  "capabilities": [
+    "dankbar-widget"
+  ],
   "component": "./src/view/NoosphereWidget.qml",
   "settings": "./src/view/Settings.qml",
   "icon": "sync",
-  "requires": ["nix", "nvd", "xdg-open"],
-  "permissions": ["process", "settings_read", "settings_write"]
+  "requires": [
+    "nix",
+    "nvd",
+    "xdg-open"
+  ],
+  "permissions": [
+    "process",
+    "settings_read",
+    "settings_write"
+  ]
 }

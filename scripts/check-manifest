@@ -1,0 +1,126 @@
+#!/usr/bin/env bash
+#
+# Check plugin.json against DankMaterialShell's own published plugin schema.
+#
+# noosphere is a plugin dropped into an arbitrary DMS installation: it cannot pin the host,
+# so the manifest is the only place the contract between the two is written down. This gate
+# catches that contract drifting — a required field lost, a value outside an enum DMS
+# accepts, a version that is not semver, a component path pointing at a file that no longer
+# exists.
+#
+# The checks are driven FROM the vendored schema rather than restating it, so the gate
+# tracks what upstream declares instead of fossilising a copy. To pick up a newer DMS, drop
+# its PLUGINS/plugin-schema.json in as a new versioned file under tests/vendor/ and update
+# SCHEMA below; what the gate enforces follows.
+#
+# The schema is vendored rather than fetched so `just ci` stays hermetic — CI has no DMS and
+# no network at test time.
+#
+# jq only: it is already in the dev shell, so this adds no dependency. This is also the one
+# gate CI *can* run, since it needs neither DMS nor Quickshell.
+
+set -euo pipefail
+
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+manifest="$root/plugin.json"
+SCHEMA="$root/tests/vendor/dms-plugin-schema-v1.6.2.json"
+
+for f in "$manifest" "$SCHEMA"; do
+    [ -r "$f" ] || {
+        echo "check-manifest: cannot read $f" >&2
+        exit 1
+    }
+done
+
+jq -e . "$manifest" >/dev/null 2>&1 || {
+    echo "check-manifest: plugin.json is not valid JSON" >&2
+    exit 1
+}
+
+fail=0
+report() {
+    echo "plugin.json: $1" >&2
+    fail=1
+}
+
+# Each jq program's output is captured into a variable FIRST, rather than piped straight
+# into `while read`. In `while read … done < <(jq …)` the producer's exit status is not
+# propagated, even under `set -e`: a jq that fails — a schema edit with a regex it rejects,
+# say — would make the check silently not run while the script still exited 0. Capturing
+# lets `set -e` see the failure.
+
+# 1 — every field the schema requires is present.
+required_missing="$(jq -r --slurpfile s "$SCHEMA" '($s[0].required // []) - keys | .[]' "$manifest")"
+while IFS= read -r key; do
+    [ -n "$key" ] || continue
+    report "missing required field $key"
+done <<<"$required_missing"
+
+# 2 — every constraint the schema states about a field it knows: type, pattern, minLength,
+#     minItems, minProperties, enum, and item enums. All read from the schema, none restated.
+#
+#     The type check has to come first and has to exist: every other check below is guarded
+#     on the value's actual JSON type, so without it a field of the wrong type skips all of
+#     them silently — `"version": 40` and `"capabilities": "x"` both sailed through before.
+field_problems="$(jq -r --slurpfile s "$SCHEMA" '
+    ($s[0].properties // {}) as $p
+    | to_entries[]
+    | select($p[.key] != null)
+    | . as $e
+    | $p[$e.key] as $spec
+    | [
+        (if ($spec.type != null)
+            and (($spec.type | if . == "integer" then "number" else . end) != ($e.value | type))
+         then "field \($e.key) should be of type \($spec.type) but is \($e.value | type)"
+         else empty end),
+        (if ($spec.minProperties != null) and ($e.value | type == "object") and (($e.value | length) < $spec.minProperties)
+         then "field \($e.key) has fewer than \($spec.minProperties) propert(y|ies)"
+         else empty end),
+        (if ($spec.pattern != null) and ($e.value | type == "string") and (($e.value | test($spec.pattern)) | not)
+         then "field \($e.key) = \($e.value) does not match the schema pattern \($spec.pattern)"
+         else empty end),
+        (if ($spec.minLength != null) and ($e.value | type == "string") and (($e.value | length) < $spec.minLength)
+         then "field \($e.key) is shorter than the schema minLength \($spec.minLength)"
+         else empty end),
+        (if ($spec.minItems != null) and ($e.value | type == "array") and (($e.value | length) < $spec.minItems)
+         then "field \($e.key) has fewer than \($spec.minItems) item(s)"
+         else empty end),
+        (if ($spec.enum != null) and (($spec.enum | index($e.value)) == null)
+         then "field \($e.key) = \($e.value) is not one of \($spec.enum | join(", "))"
+         else empty end),
+        (if ($spec.items.enum != null) and ($e.value | type == "array")
+         then ($e.value[] as $v
+               | select(($spec.items.enum | index($v)) == null)
+               | "field \($e.key) contains \($v), which is not one of \($spec.items.enum | join(", "))")
+         else empty end)
+      ][]' "$manifest")"
+while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    report "$line"
+done <<<"$field_problems"
+
+# 3 — the schema's `allOf` conditionals, which the per-field loop above cannot express.
+jq -e 'has("component") or has("components")' "$manifest" >/dev/null ||
+    report "declares neither component nor components (the schema requires one)"
+
+# A launcher — declared by `type` or by a `components.launcher` surface — needs a trigger.
+needs_trigger="$(jq -r 'if (.type == "launcher") or (.components.launcher != null) then "yes" else "no" end' "$manifest")"
+if [ "$needs_trigger" = "yes" ] && ! jq -e 'has("trigger")' "$manifest" >/dev/null; then
+    report "declares a launcher but no trigger (the schema requires one)"
+fi
+
+# 4 — the part the schema cannot express: a declared QML path must resolve to a file that
+#     exists inside the repository. A manifest whose component points nowhere passes every
+#     pattern check and still breaks on install.
+declared_paths="$(jq -r '
+    [.component?, .settings?, .startupCheck?, (.components? // {} | .[])]
+    | map(select(type == "string")) | .[]' "$manifest")"
+while IFS= read -r rel; do
+    [ -n "$rel" ] || continue
+    case "$rel" in
+        *..*) report "path '$rel' escapes the repository" && continue ;;
+    esac
+    [ -f "$root/${rel#./}" ] || report "path '$rel' does not point at a file in this repository"
+done <<<"$declared_paths"
+
+exit $fail
