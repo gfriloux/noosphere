@@ -57,6 +57,8 @@ tag_pattern = "v[0-9]*"
 sort_commits = "newest"
 
 commit_parsers = [
+  # A release commit is bookkeeping about the changelog, not a change to report in it.
+  { message = "^chore\\(release\\)", skip = true },
   { message = "^feat", group = "<!-- 0 -->Features" },
   { message = "^fix", group = "<!-- 1 -->Bug fixes" },
   { message = "^perf", group = "<!-- 2 -->Performance" },

@@ -125,7 +125,10 @@ changelog:
     set -euo pipefail
     version="v$(jq -r .version plugin.json)"
     if grep -qF "## [${version#v}]" CHANGELOG.md; then
-        echo "changelog: ${version} already has a section — nothing to prepend" >&2
+        echo "changelog: ${version} already has a section — nothing to prepend." >&2
+        echo "  If commits landed after it and the section is now incomplete, delete that" >&2
+        echo "  section from CHANGELOG.md and run this again; the published sections below" >&2
+        echo "  it are never touched." >&2
         exit 1
     fi
     git-cliff --unreleased --tag "$version" --prepend CHANGELOG.md

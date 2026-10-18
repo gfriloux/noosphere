@@ -10,6 +10,8 @@ Every notable change to noosphere. Format inspired by [Keep a Changelog], versio
 
 ### Bug fixes
 
+- **nix**: Close three gates that could pass without having checked
+- **nix**: Launch the dev bar through quickshell, not dms run
 - **view**: Keep the error status when a poll verified nothing
 - **view**: Clear the 19 findings qmllint reports once imports resolve
 
@@ -19,6 +21,7 @@ Every notable change to noosphere. Format inspired by [Keep a Changelog], versio
 
 ### Documentation
 
+- **plan**: Record the issues-pass manual validation
 - Translate the changelog scaffolding to English
 - Plan the issues pass, and correct the lint measurement
 - Apply the branch review fixes
