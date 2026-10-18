@@ -6,6 +6,42 @@ Every notable change to noosphere. Format inspired by [Keep a Changelog], versio
 [Keep a Changelog]: https://keepachangelog.com/en/1.1.0/
 [SemVer]: https://semver.org/
 
+## [0.4.0] - 2026-10-18
+
+### Bug fixes
+
+- **view**: Keep the error status when a poll verified nothing
+- **view**: Clear the 19 findings qmllint reports once imports resolve
+
+### Refactoring
+
+- **model**: Extract the poll driver out of QML and test it
+
+### Documentation
+
+- Translate the changelog scaffolding to English
+- Plan the issues pass, and correct the lint measurement
+- Apply the branch review fixes
+- Make GitHub Issues the only backlog
+- Translate DESIGN.md to English
+- Correct the README's language, git and version statements
+- Replace the house process with the superpowers norm
+- Adopt the superpowers document tree and ignore agent scratch
+- **plan**: Add backlog entry for translating cliff.toml to English
+
+### Build
+
+- **nix**: Make the lint gate blocking
+- **nix**: Resolve QML imports for qmllint through Quickshell's own VFS
+
+### Continuous integration
+
+- Validate plugin.json, and declare that CI does not lint QML
+
+### Miscellaneous
+
+- **deps**: Update softprops/action-gh-release action to v3
+
 ## [0.3.0] - 2026-08-08
 
 ### Fonctionnalités

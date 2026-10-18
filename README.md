@@ -28,11 +28,21 @@ Spirit and invariants: [`DESIGN.md`](./DESIGN.md). Working method:
 
 ## Status
 
-**v0.3.0 — drift + closure diff, GitHub queried in-process.** noosphere is **installable
-and usable**. The **bar badge** encodes the drift state (blue = up to date, yellow + dot = N
-inputs behind, grey = failed check), rosette glyph. Since v0.3.0 the GitHub compare calls
-are issued by the service itself through `XMLHttpRequest` rather than an external `curl`
-process, so the token never reaches a command line. The **cockpit popout** provides:
+**v0.4.0 — gates that guard, and a badge that no longer overstates.** noosphere is
+**installable and usable**. The **bar badge** encodes the drift state (blue = up to date,
+yellow + dot = N inputs behind, grey = failed or unverified check), rosette glyph. Since
+v0.3.0 the GitHub compare calls are issued by the service itself through `XMLHttpRequest`
+rather than an external `curl` process, so the token never reaches a command line.
+
+v0.4.0 is a quality release. The `lint` gate stopped being decorative: `qmllint` now resolves
+every import through Quickshell's own generated VFS and blocks at zero findings. The
+sequential poll driver moved out of QML into `src/model/poll.js`, pure and covered by
+scenario tests — the layer where this project's bugs had appeared was the one layer no test
+could reach. And a poll that could verify **nothing** no longer reports "up to date": it
+keeps an error status, greys the badge, and leaves the last-check timestamp alone. CI gained
+a `plugin.json` check and now states, in its own output, that it does not lint QML.
+
+The **cockpit popout** provides:
 - a **header** card (flake identity, branch, current system generation, last check);
 - an **INPUTS** card (one row per direct input: state dot, channel, lock age, drift against
   upstream, **changelog** link when hovering a row that is behind);
