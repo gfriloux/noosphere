@@ -1,10 +1,10 @@
 # Changelog
 
-Toutes les évolutions notables de noosphere. Format inspiré de [Keep a Changelog],
-versions en [SemVer]. Généré depuis les Conventional Commits par git-cliff.
+Every notable change to noosphere. Format inspired by [Keep a Changelog], versions in
+[SemVer]. Generated from the Conventional Commits by git-cliff.
 
-[Keep a Changelog]: https://keepachangelog.com/fr/1.1.0/
-[SemVer]: https://semver.org/lang/fr/
+[Keep a Changelog]: https://keepachangelog.com/en/1.1.0/
+[SemVer]: https://semver.org/
 
 ## [0.3.0] - 2026-08-08
 

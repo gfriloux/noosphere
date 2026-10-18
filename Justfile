@@ -96,6 +96,18 @@ mock scenario="drift" port="8385":
 dev-bar:
     @scripts/noosphere-dev "{{ justfile_directory() }}"
 
-# Régénère le changelog depuis les Conventional Commits (git-cliff). Relire le diff.
+# Prepend the section for the version in plugin.json to CHANGELOG.md (git-cliff). Read the
+# diff afterwards.
+#
+# This PREPENDS; it does not regenerate. Regenerating would re-emit the v0.1.0 … v0.3.0
+# sections — which describe commits written in French — under cliff.toml's English group
+# headers, rewriting the published record. Bump plugin.json first, then run this.
 changelog:
-    @git-cliff --output CHANGELOG.md
+    #!/usr/bin/env bash
+    set -euo pipefail
+    version="v$(jq -r .version plugin.json)"
+    if grep -qF "## [${version#v}]" CHANGELOG.md; then
+        echo "changelog: ${version} already has a section — nothing to prepend" >&2
+        exit 1
+    fi
+    git-cliff --unreleased --tag "$version" --prepend CHANGELOG.md
