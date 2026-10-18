@@ -181,6 +181,13 @@ in-flight request at a time is reasoned about effortlessly.
    confident number would be the display contradicting itself (invariant 11). A flake with no
    comparable input at all is **not** this case: there was nothing to verify, which is not a
    failure to verify.
+
+   **The cause is named, and shown.** The service publishes a cause *code* (`errorCause`,
+   plus `errorStatus` where the cause carries a number), never a sentence: the `model` layer
+   stays pure and the wording lives in the view, which is what makes it translatable. The
+   cockpit's status row renders that cause rather than a fixed "the check failed" — up to
+   v0.4.0 the cause was computed and then discarded, so a user saw that something broke but
+   never what.
 8. **Determinism of the data layer.** `query` + `model` are deterministic for a frozen set
    of inputs (`nix flake metadata` output + compare responses + `nvd diff` output) — that is
    what makes the golden tests possible. `behind`/`behindCount`/`barState` and

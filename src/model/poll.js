@@ -18,7 +18,7 @@
 //   { kind: "commit", verified }     publish model(st); `verified: false` means the poll
 //                                    completed without confirming anything (see
 //                                    nothingVerified)
-//   { kind: "fail",   message }      keep the last known state, show the cause
+//   { kind: "fail",   cause, status } keep the last known state, show the cause
 //   { kind: "noop" }                 nothing happened; the caller does nothing
 //
 // DESIGN invariant 10 — "a response belongs to the input that asked for it", and an
@@ -56,7 +56,9 @@ function nothingVerified(st) {
 }
 
 // What a commit should publish alongside the model. Pure, so the decision #7 turns on is
-// under test instead of living in untested QML.
+// under test instead of living in untested QML. It returns a **cause code**, never a
+// sentence: the view turns the code into words, which is what lets the wording be
+// translated.
 //
 // A poll that confirmed nothing is **not** a poll that found nothing: it reports the error
 // status, which is what greys the bar badge (DESIGN's *Secondary states*), and leaves
@@ -67,12 +69,12 @@ function commitStatus(st) {
     if (nothingVerified(st))
         return {
             connectionStatus: "error",
-            errorMessage: "aucun input n'a pu être vérifié (amont GitHub injoignable)",
+            cause: "nothing-verified",
             touchLastCheck: false
         };
     return {
         connectionStatus: "live",
-        errorMessage: "",
+        cause: "",
         touchLastCheck: true
     };
 }
@@ -100,7 +102,7 @@ function model(st) {
 function begin(st, metaJsonText) {
     var meta = _parse(metaJsonText);
     if (meta === null)
-        return _fail(st, "métadonnées du flake illisibles");
+        return _fail(st, "metadata-unreadable", 0);
 
     st.inputs = Model.parseMetadata(meta);
     st.behind = {};
@@ -112,8 +114,9 @@ function begin(st, metaJsonText) {
     return _next(st);
 }
 
-function onMetaFailed(st, message) {
-    return _fail(st, message);
+// `nix` itself failed. `exitCode` travels so the view can name it.
+function onMetaFailed(st, exitCode) {
+    return _fail(st, "flake-unreadable", exitCode);
 }
 
 function onHttpDone(st, token, status, text, timedOut) {
@@ -127,12 +130,12 @@ function onHttpDone(st, token, status, text, timedOut) {
 
     var err = Model.githubError(status, text, timedOut);
     if (err && err.fatal)
-        return _fail(st, err.message); // holds for every later request too
+        return _fail(st, err.code, err.status); // holds for every later request too
 
     var res = err ? null : _parse(text);
     var it = st.queue[st.cursor];
     if (!it)
-        return _fail(st, "réponse hors file");
+        return _fail(st, "out-of-queue", 0);
 
     if (st.phase === "repo") {
         // The response must name the repository we asked about, or it came from elsewhere.
@@ -156,7 +159,7 @@ function onHttpDone(st, token, status, text, timedOut) {
 // silent for good. The input it gave up on simply stays indeterminate.
 function onWatchdog(st) {
     if (!st.awaiting)
-        return _fail(st, "check interrompu (délai dépassé)");
+        return _fail(st, "watchdog-timeout", 0);
     _invalidate(st);
     return _advance(st);
 }
@@ -211,10 +214,11 @@ function _advance(st) {
     return _next(st);
 }
 
-function _fail(st, message) {
+function _fail(st, cause, status) {
     _invalidate(st);
     return {
         kind: "fail",
-        message: message
+        cause: cause,
+        status: status || 0
     };
 }

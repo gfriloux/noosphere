@@ -83,7 +83,9 @@ function repoBelongsTo(res, owner, repoName) {
 }
 
 // A GitHub call's HTTP status → a named cause, or `null` when the call went fine.
-// Returns { message, fatal }.
+// Returns { code, fatal, status } — a code, never a sentence: the view turns it into words,
+// which is what lets the wording be translated while this layer stays pure. `status` travels
+// with it so the view can render "(503)".
 //
 // `fatal` separates a cause that holds for **every** later request (token refused, rate
 // limit: hammering them would only make it worse) from one specific to a single input
@@ -98,19 +100,22 @@ function githubError(status, body, timedOut) {
 
     if (status === 0) {
         return {
-            "message": timedOut ? "délai dépassé" : "réseau injoignable",
-            "fatal": false
+            "code": timedOut ? "timeout" : "offline",
+            "fatal": false,
+            "status": 0
         };
     }
     if (status === 401)
         return {
-            "message": "token GitHub refusé",
-            "fatal": true
+            "code": "token-refused",
+            "fatal": true,
+            "status": status
         };
     if (status === 429)
         return {
-            "message": "limite d'API GitHub atteinte",
-            "fatal": true
+            "code": "rate-limited",
+            "fatal": true,
+            "status": status
         };
     if (status === 403) {
         // GitHub returns 403 both for a rate limit and for forbidden access; only the body
@@ -121,25 +126,29 @@ function githubError(status, body, timedOut) {
         } catch (e) {
             msg = "";
         }
-        var limite = msg.toLowerCase().indexOf("rate limit") >= 0;
+        var limited = msg.toLowerCase().indexOf("rate limit") >= 0;
         return {
-            "message": limite ? "limite d'API GitHub atteinte" : "accès refusé par GitHub",
-            "fatal": true
+            "code": limited ? "rate-limited" : "forbidden",
+            "fatal": true,
+            "status": status
         };
     }
     if (status === 404)
         return {
-            "message": "dépôt introuvable",
-            "fatal": false
+            "code": "not-found",
+            "fatal": false,
+            "status": status
         };
     if (status >= 500)
         return {
-            "message": "GitHub indisponible (" + status + ")",
-            "fatal": false
+            "code": "unavailable",
+            "fatal": false,
+            "status": status
         };
     return {
-        "message": "réponse inattendue de GitHub (" + status + ")",
-        "fatal": false
+        "code": "unexpected",
+        "fatal": false,
+        "status": status
     };
 }
 

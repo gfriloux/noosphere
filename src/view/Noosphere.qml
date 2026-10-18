@@ -38,7 +38,10 @@ QtObject {
     property string barState: "uptodate" // uptodate | drift (| rebuilding, cap futur)
     // idle | polling | live | error
     property string connectionStatus: "idle"
-    property string errorMessage: ""
+    // A cause CODE, not a sentence — the cockpit turns it into words. `errorStatus` carries
+    // the HTTP status or the `nix` exit code when the cause names one.
+    property string errorCause: ""
+    property int errorStatus: 0
     property double lastCheck: 0 // unix secondes
     property int generation: 0 // n° de génération système courante (0 = inconnu)
     property double generationActivatedAt: 0 // unix secondes (mtime du profil)
@@ -106,7 +109,7 @@ QtObject {
             return;
         }
         if (eff.kind === "fail") {
-            root._failWith(eff.message);
+            root._failWith(eff.cause, eff.status);
             return;
         }
     }
@@ -125,7 +128,8 @@ QtObject {
         root.barState = m.barState;
         var cs = Poll.commitStatus(root._st);
         root.connectionStatus = cs.connectionStatus;
-        root.errorMessage = cs.errorMessage;
+        root.errorCause = cs.cause;
+        root.errorStatus = 0;
         if (cs.touchLastCheck)
             root.lastCheck = Date.now() / 1000;
         root._busy = false;
@@ -133,11 +137,12 @@ QtObject {
 
     // Best-effort: keeps the last known state (DESIGN invariant 7). Closes the step in
     // flight so a late response cannot apply itself to the next poll.
-    function _failWith(msg) {
+    function _failWith(cause, status) {
         stepWatchdog.stop();
         root._abortPending();
         root.connectionStatus = "error";
-        root.errorMessage = msg;
+        root.errorCause = cause;
+        root.errorStatus = status || 0;
         root._busy = false;
     }
 
@@ -264,7 +269,7 @@ QtObject {
         // handler. Remove once upstream exposes ExitStatus in its qmltypes.
         onExited: code => {
             if (code !== 0 && root._busy)
-                root._perform(Poll.onMetaFailed(root._st, "flake illisible (nix " + code + ")"));
+                root._perform(Poll.onMetaFailed(root._st, code));
         }
         // qmllint enable signal-handler-parameters
     }

@@ -32,6 +32,66 @@ PopoutComponent {
     readonly property bool isError: service && service.connectionStatus === "error"
     readonly property var inputs: service ? service.inputs : []
 
+    // ---- Sentence composition ----
+    //
+    // The model layer returns state, never prose, so the wording lives here. Task 4 of the
+    // English/i18n pass wraps each of these literals in I18n.trFor; keeping composition and
+    // translation as two steps is what makes each reviewable on its own.
+
+    function ageText(tsSeconds) {
+        var a = Format.relativeAgeParts(tsSeconds, cockpit.now);
+        if (a.unit === "now")
+            return "à l'instant";
+        if (a.unit === "minutes")
+            return "il y a " + a.value + " min";
+        if (a.unit === "hours")
+            return "il y a " + a.value + " h";
+        return "il y a " + a.value + " j";
+    }
+
+    function behindText(behind) {
+        if (typeof behind !== "number")
+            return "—";
+        if (behind <= 0)
+            return "à jour";
+        return behind + (behind > 1 ? " commits en retard" : " commit en retard");
+    }
+
+    // The cause the service published, as a sentence. Every branch must be covered: an
+    // unhandled code would silently render the generic fallback and hide what went wrong.
+    function causeText(cause, status) {
+        switch (cause) {
+        case "nothing-verified":
+            return "aucun input n'a pu être vérifié";
+        case "timeout":
+            return "délai dépassé";
+        case "offline":
+            return "réseau injoignable";
+        case "token-refused":
+            return "token GitHub refusé";
+        case "rate-limited":
+            return "limite d'API GitHub atteinte";
+        case "forbidden":
+            return "accès refusé par GitHub";
+        case "not-found":
+            return "dépôt introuvable";
+        case "unavailable":
+            return "GitHub indisponible (" + status + ")";
+        case "unexpected":
+            return "réponse inattendue de GitHub (" + status + ")";
+        case "metadata-unreadable":
+            return "métadonnées du flake illisibles";
+        case "flake-unreadable":
+            return "flake illisible (nix " + status + ")";
+        case "watchdog-timeout":
+            return "check interrompu (délai dépassé)";
+        case "out-of-queue":
+            return "réponse hors file";
+        default:
+            return "échec du check";
+        }
+    }
+
     // A coarse clock to refresh the relative ages; they move slowly.
     property double now: Date.now() / 1000
     Timer {
@@ -172,7 +232,7 @@ PopoutComponent {
                             }
                             StyledText {
                                 anchors.verticalCenter: parent.verticalCenter
-                                text: cockpit.service && cockpit.service.generation > 0 ? ("génération n°" + cockpit.service.generation + " · activée " + Format.relativeAge(cockpit.service.generationActivatedAt, cockpit.now)) : "génération courante inconnue"
+                                text: cockpit.service && cockpit.service.generation > 0 ? ("génération n°" + cockpit.service.generation + " · activée " + cockpit.ageText(cockpit.service.generationActivatedAt)) : "génération courante inconnue"
                                 font.pixelSize: Theme.fontSizeSmall
                                 color: "#a6adc8"
                             }
@@ -181,7 +241,7 @@ PopoutComponent {
                         StyledText {
                             anchors.right: parent.right
                             anchors.verticalCenter: parent.verticalCenter
-                            text: cockpit.service && cockpit.service.lastCheck > 0 ? ("check amont · " + Format.relativeAge(cockpit.service.lastCheck, cockpit.now)) : "check amont · en attente…"
+                            text: cockpit.service && cockpit.service.lastCheck > 0 ? ("check amont · " + cockpit.ageText(cockpit.service.lastCheck)) : "check amont · en attente…"
                             font.pixelSize: Theme.fontSizeSmall
                             color: "#6c7086"
                         }
@@ -257,7 +317,7 @@ PopoutComponent {
                     StyledText {
                         width: parent.width
                         visible: cockpit.isError
-                        text: "échec du check · réessayer"
+                        text: (cockpit.service ? cockpit.causeText(cockpit.service.errorCause, cockpit.service.errorStatus) : "échec du check") + " · réessayer"
                         font.pixelSize: Theme.fontSizeSmall
                         color: "#f38ba8"
                     }
@@ -341,7 +401,7 @@ PopoutComponent {
                                 StyledText {
                                     Layout.fillWidth: true
                                     elide: Text.ElideRight
-                                    text: "lock " + Format.relativeAge(row.modelData.lockedAt, cockpit.now)
+                                    text: "lock " + cockpit.ageText(row.modelData.lockedAt)
                                     font.pixelSize: Theme.fontSizeSmall
                                     color: "#6c7086"
                                 }
@@ -384,7 +444,7 @@ PopoutComponent {
                                 StyledText {
                                     Layout.alignment: Qt.AlignVCenter
                                     wrapMode: Text.NoWrap
-                                    text: Format.behindLabel(row.modelData.behind)
+                                    text: cockpit.behindText(row.modelData.behind)
                                     font.family: Theme.defaultMonoFontFamily
                                     font.pixelSize: Theme.fontSizeSmall
                                     font.weight: Font.DemiBold

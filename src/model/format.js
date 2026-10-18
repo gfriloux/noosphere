@@ -22,33 +22,36 @@ function inputDotColor(behind) {
     return (typeof behind === "number" && behind > 0) ? "#f9e2af" : "#a6e3a1";
 }
 
-// Lag text, right-aligned on an input row.
-// null (indeterminate) → "—" ; 0 → "à jour" ; N → "N commits en retard".
-function behindLabel(behind) {
-    if (typeof behind !== "number")
-        return "—";
-    if (behind <= 0)
-        return "à jour";
-    return behind + (behind > 1 ? " commits en retard" : " commit en retard");
-}
-
 // Web URL of the GitHub compare (the read-only "changelog" link): the browser opens it.
 function compareWebUrl(owner, repo, base, head) {
     return "https://github.com/" + owner + "/" + repo + "/compare/" + base + "..." + head;
 }
 
-// Short relative time from a unix timestamp (seconds). `now` in seconds.
-// « à l'instant » · « il y a 12 min » · « il y a 3 h » · « il y a 9 j ».
-function relativeAge(tsSeconds, nowSeconds) {
+// Relative age from a unix timestamp (seconds); `now` in seconds. Returns the **parts** of
+// the age, never a sentence: { unit, value } with unit ∈ now | minutes | hours | days. The
+// view turns that into words, so the wording is translatable and this layer stays pure.
+// A timestamp in the future clamps to `now` rather than going negative.
+function relativeAgeParts(tsSeconds, nowSeconds) {
     var d = Math.max(0, Math.floor(nowSeconds - tsSeconds));
     if (d < 60)
-        return "à l'instant";
+        return {
+            "unit": "now",
+            "value": 0
+        };
     var mins = Math.floor(d / 60);
     if (mins < 60)
-        return "il y a " + mins + " min";
+        return {
+            "unit": "minutes",
+            "value": mins
+        };
     var hours = Math.floor(mins / 60);
     if (hours < 24)
-        return "il y a " + hours + " h";
-    var days = Math.floor(hours / 24);
-    return "il y a " + days + " j";
+        return {
+            "unit": "hours",
+            "value": hours
+        };
+    return {
+        "unit": "days",
+        "value": Math.floor(hours / 24)
+    };
 }

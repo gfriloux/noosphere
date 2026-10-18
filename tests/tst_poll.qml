@@ -170,7 +170,7 @@ TestCase {
         drive(s, responder(2));
         var cs = Poll.commitStatus(s);
         compare(cs.connectionStatus, "live");
-        compare(cs.errorMessage, "");
+        compare(cs.cause, "");
         compare(cs.touchLastCheck, true);
     }
 
@@ -188,7 +188,7 @@ TestCase {
         });
         var cs = Poll.commitStatus(s);
         compare(cs.connectionStatus, "error");
-        verify(cs.errorMessage.length > 0);
+        compare(cs.cause, "nothing-verified");
         compare(cs.touchLastCheck, false);
     }
 
@@ -232,7 +232,7 @@ TestCase {
             };
         });
         compare(eff.kind, "fail");
-        compare(eff.message, "limite d'API GitHub atteinte");
+        compare(eff.cause, "rate-limited");
     }
 
     function test_poll_metaUnparseable() {
