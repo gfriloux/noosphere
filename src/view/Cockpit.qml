@@ -402,8 +402,16 @@ PopoutComponent {
                                 }
                                 // Elastic, elidable lock age: it absorbs the missing room — long
                                 // names, large counters — and pushes the lag to the right.
+                                //
+                                // `wrapMode: NoWrap` is load-bearing, not decoration: DMS's
+                                // StyledText defaults to WordWrap, and `elide` does nothing
+                                // while a text may wrap. Left to wrap, a lock age too wide for
+                                // its slot breaks onto a second line inside a row fixed at 30px
+                                // — which is what "lock il y a 31 j" does in French next to a
+                                // channel chip. Elide, as the sibling lag column already does.
                                 StyledText {
                                     Layout.fillWidth: true
+                                    wrapMode: Text.NoWrap
                                     elide: Text.ElideRight
                                     text: I18n.trFor("noosphere", "lock %1").arg(cockpit.ageText(row.modelData.lockedAt))
                                     font.pixelSize: Theme.fontSizeSmall
