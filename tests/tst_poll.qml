@@ -162,6 +162,64 @@ TestCase {
         compare(Poll.model(s).inputs[0].behind, null);
     }
 
+    // ---- commitStatus: what a commit publishes (this is #7) ----
+
+    // A poll that confirmed something publishes as live and stamps lastCheck.
+    function test_commitStatus_verified() {
+        var s = st();
+        drive(s, responder(2));
+        var cs = Poll.commitStatus(s);
+        compare(cs.connectionStatus, "live");
+        compare(cs.errorMessage, "");
+        compare(cs.touchLastCheck, true);
+    }
+
+    // A poll that confirmed nothing must NOT read as up to date. It keeps an error status,
+    // names the cause, and leaves lastCheck alone: refreshing it would advertise a
+    // verification that did not happen, and the badge and the timestamp would then disagree
+    // (DESIGN invariant 11).
+    function test_commitStatus_nothingVerified() {
+        var s = st();
+        drive(s, function (url) {
+            return {
+                "status": 500,
+                "text": ""
+            };
+        });
+        var cs = Poll.commitStatus(s);
+        compare(cs.connectionStatus, "error");
+        verify(cs.errorMessage.length > 0);
+        compare(cs.touchLastCheck, false);
+    }
+
+    // A flake with nothing comparable is not a failed verification.
+    function test_commitStatus_nothingToVerify() {
+        var s = st();
+        Poll.begin(s, JSON.stringify({
+            "locks": {
+                "root": "root",
+                "nodes": {
+                    "root": {
+                        "inputs": {
+                            "mytool": "mytool"
+                        }
+                    },
+                    "mytool": {
+                        "locked": {
+                            "type": "git",
+                            "rev": "cafe",
+                            "lastModified": 1
+                        },
+                        "original": {
+                            "type": "git"
+                        }
+                    }
+                }
+            }
+        }));
+        compare(Poll.commitStatus(s).connectionStatus, "live");
+    }
+
     // A fatal cause stops the whole poll rather than leaving each input indeterminate.
     function test_poll_rateLimited() {
         var s = st();
@@ -324,5 +382,6 @@ TestCase {
         verify(typeof Poll.onMetaFailed === "function");
         verify(typeof Poll.model === "function");
         verify(typeof Poll.nothingVerified === "function");
+        verify(typeof Poll.commitStatus === "function");
     }
 }

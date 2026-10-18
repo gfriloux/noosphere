@@ -55,6 +55,28 @@ function nothingVerified(st) {
     return true;
 }
 
+// What a commit should publish alongside the model. Pure, so the decision #7 turns on is
+// under test instead of living in untested QML.
+//
+// A poll that confirmed nothing is **not** a poll that found nothing: it reports the error
+// status, which is what greys the bar badge (DESIGN's *Secondary states*), and leaves
+// `lastCheck` alone. Refreshing `lastCheck` there would advertise a verification that never
+// happened, and the badge and the timestamp would then say different things about the same
+// state — which invariant 11 forbids.
+function commitStatus(st) {
+    if (nothingVerified(st))
+        return {
+            connectionStatus: "error",
+            errorMessage: "aucun input n'a pu être vérifié (amont GitHub injoignable)",
+            touchLastCheck: false
+        };
+    return {
+        connectionStatus: "live",
+        errorMessage: "",
+        touchLastCheck: true
+    };
+}
+
 // ---- Public: the published model --------------------------------------------------------
 
 function model(st) {

@@ -167,10 +167,20 @@ in-flight request at a time is reasoned about effortlessly.
 6. **Flake-agnostic.** noosphere does not model flakes as first-class entities: a flake is
    only a **facet** (path + owner/repo + branch + token). Single- or multi-flake are modelled
    with no special handling — a future multi-flake view will be a plan if the need emerges.
-7. **Best-effort on the connection.** The state (`live | polling | error`) is *observed*. A
-   flake that cannot be found, a slow `nix`, GitHub unreachable or rate-limited **degrades
-   the display** (last known state + error status, grey badge), and **never** crashes the
-   widget.
+7. **Best-effort on the connection.** The state (`idle | polling | live | error`) is
+   *observed* — `idle` while no flake path is configured. A flake that cannot be found, a slow
+   `nix`, GitHub unreachable or rate-limited **degrades the display** (last known state +
+   error status, grey badge), and **never** crashes the widget.
+
+   A poll in which **every comparable input ended indeterminate** is one of those degraded
+   cases, not a successful one: it reports `error`, and `lastCheck` keeps the timestamp of the
+   last poll that actually verified something. The input list *is* still published — the local
+   `nix flake metadata` succeeded, only the GitHub half failed, and discarding local truth
+   that was verified would serve nobody — with every lag indeterminate. The bar badge is
+   therefore grey with **no pill**: the count is genuinely unknown, and a grey glyph beside a
+   confident number would be the display contradicting itself (invariant 11). A flake with no
+   comparable input at all is **not** this case: there was nothing to verify, which is not a
+   failure to verify.
 8. **Determinism of the data layer.** `query` + `model` are deterministic for a frozen set
    of inputs (`nix flake metadata` output + compare responses + `nvd diff` output) — that is
    what makes the golden tests possible. `behind`/`behindCount`/`barState` and

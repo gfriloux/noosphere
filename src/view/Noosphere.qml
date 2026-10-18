@@ -111,6 +111,11 @@ QtObject {
         }
     }
 
+    // Publie le modèle du poll. Le statut vient de `Poll.commitStatus()`, pas d'ici : un poll
+    // qui n'a **rien pu vérifier** publie quand même la liste fraîchement lue (le `nix flake
+    // metadata` a réussi, seule la moitié GitHub a échoué) mais sous statut d'erreur, et sans
+    // toucher `lastCheck`. Le badge est alors gris — `stateColor` dérive de
+    // `connectionStatus === "error"` — au lieu d'annoncer « à jour » sans l'avoir vérifié.
     function _publish() {
         stepWatchdog.stop();
         var m = Poll.model(root._st);
@@ -118,9 +123,11 @@ QtObject {
         root.behindCount = m.behindCount;
         root.upToDateCount = m.upToDateCount;
         root.barState = m.barState;
-        root.connectionStatus = "live";
-        root.errorMessage = "";
-        root.lastCheck = Date.now() / 1000;
+        var cs = Poll.commitStatus(root._st);
+        root.connectionStatus = cs.connectionStatus;
+        root.errorMessage = cs.errorMessage;
+        if (cs.touchLastCheck)
+            root.lastCheck = Date.now() / 1000;
         root._busy = false;
     }
 
