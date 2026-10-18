@@ -4,13 +4,20 @@
 .direnv
 .envrc
 
-# Scratch — design handoffs, notes, sorties de travail (jamais commité)
+# Scratch — design handoffs, notes, working output (never committed)
 tmp/
 
-# Claude Code — réglages locaux et worktrees d'agents (les plans, eux, sont versionnés)
+# Superpowers — agent scratch (ledgers, briefs, review packages).
+# The rule lives here and not only in .superpowers/sdd/.gitignore: that file is created by
+# the tooling, covers sdd/ alone, and does not exist before the tooling's first run — so a
+# freshly created git worktree would start with unignored scratch.
+.superpowers/
+
+# Claude Code — local settings and agent worktrees.
+# .claude/plans/ stays versioned: it is the frozen archive of v0.1.0 … v0.3.0.
 .claude/settings.local.json
 .claude/worktrees/
 
-# Éditeurs
+# Editors
 *.qmlc
 *.jsc

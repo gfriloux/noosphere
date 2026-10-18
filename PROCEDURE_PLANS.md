@@ -1,176 +1,218 @@
-# PROCEDURE_PLANS.md — Procédure de planification de noosphere
+# PROCEDURE_PLANS.md — noosphere project specifics
 
-> Ce document définit le processus à suivre **systématiquement** avant tout travail
-> sur le code. Chaque changement est décomposé en étapes atomiques, testables et
-> commitables isolément.
+> **The process is superpowers** (the agent skill set; `superpowers:<skill>` below).
+> This document holds only what superpowers cannot know about this repository: its gates,
+> its test discipline, its toolchain, its language rules, its git identity, its backlog.
 >
-> **Règle fondamentale : on ne code pas sans plan validé.**
-> Et : lis [`DESIGN.md`](DESIGN.md) avant tout changement. Si une idée ne s'inscrit
-> pas dans les invariants, la réponse est non.
+> Read [`DESIGN.md`](DESIGN.md) first. **It outranks every skill.** If an idea does not fit
+> its invariants, the answer is no — that is not a process question.
 
 ---
 
-## 1. Créer le plan avant tout
+## 1. Where the process lives
 
-Dès qu'une version ou une feature est évoquée, créer :
-
-```
-.claude/plans/v{X.Y.Z}/
-  plan.md           ← contexte, périmètre, phases, décisions, fichiers touchés
-  manual_tests.md   ← tests manuels (enrichis au fil du dev, exécutés en validation)
-  phase0_results.md ← état réel du dépôt avant de coder (cf. §2)
-```
-
-Les plans vivent **dans `.claude/plans/`**, jamais à la racine. Un plan obsolète est
-**supprimé**, pas dupliqué en `_v2`/`_v3`.
-
-### Contenu minimal de `plan.md`
-
-- **Contexte** : d'où on part, pourquoi.
-- **Objectif** : ce qu'on veut atteindre.
-- **Périmètre** : in scope / out of scope explicites.
-- **Étage(s) concerné(s)** : `query` | `model` | `view` | `nix` | `doc`.
-- **État du working tree** : ce qui est déjà là, ce qui doit disparaître.
-- **Phases / étapes atomiques ordonnées** : chacune avec vérification + message de commit.
-- **Décisions techniques** : choix et justifications.
-
----
-
-## 2. Phase 0 — Audit obligatoire
-
-**Avant de toucher au code**, vérifier l'état réel — ne jamais supposer le dépôt propre :
-
-```bash
-nix develop --command just ci
-```
-
-Consigner le résultat dans `.claude/plans/v{X.Y.Z}/phase0_results.md`.
-
----
-
-## 3. Politique git — hybride
-
-- Claude travaille sur une **branche dédiée** (`feat/…`, `fix/…`, `chore/…`,
-  `refactor/…`, `docs/…`), jamais directement sur `main`.
-- Claude **commite atomiquement** : un changement logique = un commit, en
-  [Conventional Commits](#convention-de-commit). Chaque commit passe les portes seul.
-- Claude ne fait **jamais** `merge`, `push` ni `tag`. L'utilisateur relit, merge sur
-  `main` et push.
-- **Un plan se termine toujours par un merge sur `main`.** À la clôture (portes vertes),
-  l'utilisateur merge la branche du plan sur `main` et push, **avant** de démarrer le plan
-  suivant. On ne laisse pas une branche de plan terminée non mergée : chaque plan part d'un
-  `main` à jour.
-
-### Convention de commit
-
-```
-type(scope): message court à l'impératif
-```
-
-- **type** : `feat`, `fix`, `refactor`, `perf`, `test`, `docs`, `chore`, `ci`.
-- **scope** : `query`, `model`, `view`, `nix`, `ui`, ou le module touché.
-
-La doc se met à jour **dans le même commit** que le code qu'elle décrit. Un changement
-structurel commité sans MAJ de `DESIGN.md`/`README.md` rend la doc périmée — c'est un défaut.
-
----
-
-## 4. Discipline de test — golden sur la couche données
-
-La couche `query` + `model` est déterministe : un jeu d'entrées figé (sortie
-`nix flake metadata --json` + réponses compare GitHub) produit un modèle exact. On stocke
-ce modèle attendu en **fichier de référence** :
-
-```
-tests/fixtures/<cas>.json     ← entrée figée (metadata nix / compare GitHub / états à joindre)
-tests/golden/<cas>.json       ← modèle de domaine attendu
-```
-
-- Un changement de comportement se voit dans le **diff du golden**.
-- Un golden qui change par accident = **blocage dur**.
-- Régénérer un golden intentionnellement : `just bless`, puis **relire le diff**.
-- **Aucun secret dans les fixtures.** Le token GitHub vit dans un header injecté par le
-  service ; les entrées figées (compare public) n'en contiennent jamais (cf. DESIGN.md).
-
-**On automatise** : parse de `nix flake metadata` → inputs directs, parse du compare →
-`behind`, jointure input↔retard, `behindCount`, `barState`. **On n'automatise pas** : le
-rendu QML pixel-perfect, le vrai `nix`/réseau GitHub, le lancement Quickshell sur Wayland.
-Ces points partent dans `manual_tests.md`.
-
----
-
-## 5. Types de changement & recettes
-
-| Type | Étage | Étapes (chacune = 1 commit) |
+| Step | Skill | Artifact |
 |---|---|---|
-| Nouvelle commande / champ de modèle | `query` `model` | 1. fixture+golden (`test(model): …`) → 2. impl (`feat(query): …`) → 3. doc |
-| Nouveau calcul (behind, état) | `model` | 1. fixture+golden → 2. impl (`feat(model): …`) → 3. doc DESIGN si invariant touché |
-| Changement de vue / composant | `view` | 1. impl QML (`feat(view): …`) → 2. `manual_tests.md` mis à jour → relecture visuelle |
-| Correction de bug | étage concerné | 1. test de régression qui échoue (`test: reproduce …`) → 2. fix (`fix(scope): …`) |
-| Refactor | étage concerné | 1. refactor sans changer de golden (`refactor(scope): …`). Si un golden bouge, ce n'était pas un refactor. |
-| Doc seule | — | `docs: …` |
+| Work out what we want | `superpowers:brainstorming` | `docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md` |
+| Turn it into tasks | `superpowers:writing-plans` | `docs/superpowers/plans/YYYY-MM-DD-<feature>.md` |
+| Isolate the workspace | `superpowers:using-git-worktrees` | a worktree on a dedicated branch |
+| Implement | `superpowers:executing-plans` | atomic commits + a ledger |
+| Prove each change | `superpowers:test-driven-development` | a test watched failing, then passing (§6 narrows this for `view`) |
+| Independent review | `superpowers:requesting-code-review` | findings, re-graded by effect |
+| Integrate | `superpowers:finishing-a-development-branch` | a `--no-ff` merge into `main` |
 
----
+Both document directories are committed. Nothing new lands under `.claude/plans/` (see §8).
+An obsolete spec or plan is **deleted**, never kept alongside its replacement: the dated
+filenames make a stale document look like history rather than the duplicate it is.
 
-## 6. Gabarit de plan
+The version a plan ships (`v0.4.0`, …) belongs in the plan's **Goal** line, not in its
+filename — a release is a property of the work, not of the document tree.
 
-```markdown
-## Plan : [Titre]
+**`manual_tests.md` and `phase0_results.md` no longer exist as files.** Both fold into the
+plan, which is where superpowers puts verification:
 
-**Type :** [commande | modèle/behind | vue | bug | refactor | doc]
-**Objectif :** ...
-**Pourquoi :** ...
-**Étage(s) :** [query | model | view | nix | doc]
+- the **phase-0 audit** is the plan's first step — run `nix develop --command just ci` on an
+  up-to-date `main` and record the result on one line. Never assume the tree is clean;
+- **manual tests** are verification steps attached to the task they validate, in superpowers'
+  step style: the command to run, the result that means it passed, a `- [ ]` checkbox;
+- the **closing run** gets a final `## Manual validation` section in the plan: the date,
+  which boxes were exercised, and which were not and why.
 
-### Fichiers touchés
-- [ ] `src/...`
-- [ ] `tests/fixtures/...` / `tests/golden/...`
-- [ ] `DESIGN.md` / `README.md`
+**Execution method: native by default.** `superpowers:writing-plans` offers subagent-driven
+or native execution; this repository defaults to **native**, because the commit-series rule
+in §3 needs commits arriving from one context in one burst. A plan whose tasks are genuinely
+independent can opt into subagent-driven execution — that is a decision taken at the plan
+review, with the extra signing prompts named out loud.
 
-### Étapes atomiques
-#### Étape 1 : [Titre]
-**Description :** ...
-**Vérification :** `just ci` (ou la cible pertinente)
-**Commit :** `type(scope): message`
+## 2. When the agent stops
 
-### Portes de qualité
-- [ ] `just ci` passe
-- [ ] Goldens à jour et intentionnels
-- [ ] Doc synchronisée (même commit)
-- [ ] Commits atomiques sur une branche dédiée
+The agent runs a plan end to end without asking permission per step. It stops when there is
+something to **decide**: a design choice that changes what gets built, an ambiguity in the
+spec, friction against a `DESIGN.md` invariant, a surprise that invalidates the plan.
+
+Superpowers' own gates are kept, because each is a decision and not a step approval: the
+brainstorming gate (nothing is built before the design is approved), the plan review, and
+the choice of execution method.
+
+Subagents — independent review, builder check, research, parallel exploration — are
+dispatched without asking.
+
+## 3. Git
+
+- Dedicated branch (`feat/`, `fix/`, `chore/`, `refactor/`, `docs/`), never directly on
+  `main`.
+- Atomic commits: one logical change, one commit, each passing the gates on its own.
+- **Commits and tags are GPG-signed.** The global git config already resolves to
+  `guillaume@friloux.me` with `commit.gpgsign` and `tag.gpgsign` true — noosphere needs **no
+  local `user.email` override**. (Note for whoever compares: astropath carries one.)
+- Every commit ends with the trailer
+  `Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>`.
+- The agent **announces a commit series before running it**, so the passphrase is typed once
+  (`gpg-agent` caches it a few minutes) and the burst goes through.
+- The agent may `merge`, `push` and `tag` — **including the release tag** (see `README.md`
+  §Release). **Merge form: `git merge --no-ff`**, always a merge commit, so a plan's branch
+  stays legible and its closure is one point in the log. The signed merge commit asks for the
+  passphrase; that prompt is the stop.
+- A finished branch is never left unmerged: every plan starts from an up-to-date `main`.
+
+A PR merged through GitHub's web UI produces a commit signed by GitHub's key, which reports
+as unverifiable locally (`%G?` = `E`). That is not a defect, but it is a further reason for
+integrations to run locally under `--no-ff`.
+
+### Commit convention
+
+```
+type(scope): short imperative message
 ```
 
----
+- **type**: `feat`, `fix`, `refactor`, `perf`, `test`, `docs`, `chore`, `ci`.
+- **scope**: `query`, `model`, `view`, `nix`, `ui`, or the module touched.
 
-## 7. Portes de qualité
+Docs are updated **in the same commit** as the code they describe. A structural change
+committed without updating `DESIGN.md`/`README.md` leaves the docs stale — that is a defect,
+not a follow-up.
 
-Tout changement passe ces portes avant d'être considéré comme terminé. **Une seule
-définition** : le `Justfile`. pre-commit et la CI l'appellent.
+## 4. Quality gates
+
+**One single definition: the `Justfile`.** pre-commit and CI both call it, and no other
+document **redefines** the gates — a list elsewhere (here, `CLAUDE.md`, `README.md`) is a
+convenience copy of the `Justfile`, never a second source.
 
 ```bash
-just fmt-check   # qmlformat — aucun fichier non formaté
-just lint        # qmllint — aucun warning toléré
-just test        # golden (entrées figées → modèle) + Qt Quick Test
-just ci          # les trois d'affilée
+just fmt-check   # qmlformat — no unformatted file
+just lint        # qmllint — no warning tolerated
+just test        # goldens (frozen inputs → model) + Qt Quick Test
+just ci          # all three in a row
 ```
 
+> **The `lint` gate is currently blind.** `qmllint` runs with no `-I` import path, so it
+> fails at `import QtQuick`, cascades into unresolved-type noise, and **still exits 0** —
+> `just ci` stays green whatever the QML does. Tracked with its measurements in **issue #6**.
+> Measured 2026-10-18, `src/` identical to `main` @ `900c54b`, with
+> `nix develop --command just lint 2>&1 | grep -c Warning`: **717** warning lines, of which
+> **4** are `Failed to import` (`QtQuick`, `qs.Common`, `qs.Widgets`, `qs.Modules.Plugins` —
+> note that `Quickshell.Io` and `QtQuick.Layouts` do resolve), and the recipe still exits 0.
+> Until it is fixed, a green `just ci` proves `fmt-check` and `test`, and nothing about QML.
+
+## 5. Determinism — goldens on the data layer
+
+The `query` + `model` layer is deterministic: a frozen input set (`nix flake metadata
+--json` output + GitHub compare responses + `nvd diff` output) produces an exact model,
+stored as a reference file.
+
+```
+tests/fixtures/<case>.json     ← frozen input (nix metadata / GitHub compare / states to join)
+tests/golden/<case>.json       ← expected domain model
+```
+
+- A behaviour change shows up in the **golden diff**.
+- A golden that changes by accident = **hard stop**.
+- To regenerate one on purpose: `just bless`, then **review the diff**.
+- **No secret in the fixtures.** The GitHub token lives in a header injected by the service;
+  the frozen inputs (public compares) never contain one (see `DESIGN.md`, invariant 5).
+
+| Change | Stage | Order |
+|---|---|---|
+| New command / model field | `query` `model` | fixture+golden → impl → docs |
+| New computation (behind, state) | `model` | fixture+golden → impl → `DESIGN.md` if an invariant moves |
+| View / component change | `view` | impl → manual verification → visual review |
+| Bug fix | affected | failing regression test → fix |
+| Refactor | affected | no golden moves. If a golden moves, it was not a refactor. |
+
+## 6. Test-driven development, and the `view` exception
+
+`superpowers:test-driven-development` applies wherever a test can express the change:
+
+- **`query` / `model` — fully.** Fixture + golden first (RED), then implementation (GREEN).
+  That is §5, and it already satisfies TDD.
+- **`view` (QML) — partially.** Logic extracted out of QML is testable and gets its test
+  first. Rendering, live settings and a real DMS instance are not. There, the "failing test"
+  step is replaced by a **manual verification step written before the implementation**: the
+  plan states what to look at and what the right outcome is, before the code exists. TDD's
+  intent is kept — the expected result is decided before the implementation — only the
+  automation is unavailable.
+
+This exception is narrow and decided. It is **not** a licence to skip tests anywhere a test
+could have been written. Note where it bites: the `Noosphere` and `Closure` service drivers
+are the layer with no automated coverage at all, and the layer where this project's live bugs
+surfaced. Pushing that boundary back is work the backlog tracks, not a standing permission.
+
+## 7. What is automated, and what is not
+
+**Automated**: parsing `nix flake metadata` → direct inputs, parsing a compare → `behind`,
+joining input↔`behind`, `behindCount`, `barState`, `parseNvdDiff`, severity, URL and argv
+construction. That is the whole `query` + `model` layer, and §5 is how it is tested. A change
+there with no fixture and no golden is incomplete, not merely untested.
+
+**Not automated**: pixel-perfect QML rendering, a real `nix` and a real GitHub, launching
+Quickshell on Wayland, live settings, the actual closure build.
+
+These become **verification steps inside the plan**, attached to the task they validate, as
+described in §1.
+
+**Worktrees, the dev bar and the mock.** A plan executes in an isolated worktree.
+`just dev-bar` takes the repository root as an argument (`justfile_directory()`) and
+symlinks `src/` live, so it works from any worktree — but its isolated state root
+(`$XDG_STATE_HOME/noosphere-dev`) is single, so **one dev bar at a time**. `just mock` serves
+the GitHub compare API with no network (`drift | uptodate | ratelimit | error`) and binds a
+port, 8385 by default, so likewise **one mock at a time** unless the port is overridden.
+
+## 8. Toolchain, language, backlog, scratch
+
+- **Nix.** Always `nix develop`, or `nix develop --command …` for non-interactive commands.
+- **Language.**
+
+  > English is noosphere's default language — documents, code comments, commit messages, and
+  > the software's own copy. The UI is French today and stays French until the English/i18n
+  > plan lands; French then becomes one locale of two, if EN/FR internationalisation proves
+  > workable in a hot-loaded DMS plugin.
+
+  Consequences:
+  - A French UI string is **quoted** when a document describes it, never silently translated
+    as a side effect of another change. `DESIGN.md`'s visual system says so on the spot.
+  - The rule **binds GitHub Issues** too, now that Issues is the only backlog and therefore
+    part of the project's written record: titles, bodies, comments, PR descriptions in
+    English. One carve-out: a **measurement carried from elsewhere is reproduced as a
+    verbatim quoted block**, not translated — a wording slip in a measured finding rewrites
+    the record rather than the prose around it.
+  - `CHANGELOG.md`'s already-published sections **stay French**: they describe French
+    commits, and rewriting them would be a retroactive lie. The file is bilingual by
+    construction, cut at the first version after the switch.
+
+  **This rule differs from astropath's**, which is "English docs, French UI". Do not copy
+  astropath's version into this repository.
+- **GitHub Issues is the only backlog.** There is no `TODO.md` and no second list in the
+  repository. A future cap documented in `DESIGN.md` keeps its rationale there and gets an
+  issue as its tracking entry.
+- **`.claude/plans/` is a frozen archive** of the v0.1.0 … v0.3.0 plans. It records the house
+  process that was in force then; none of it binds anything now, and nothing new is added to
+  it.
+- **Scratch, never committed.** `tmp/` (design handoffs, notes, working output) and
+  `.superpowers/` (agent ledgers, briefs, review packages).
+- **Release tooling** (Renovate, git-cliff, CI + the release workflow) has been in place
+  since v0.1.0. The sequence lives in `README.md` §Release.
+
 ---
 
-## 8. Ce qui ne change pas entre les versions
-
-- **DESIGN.md fait foi.** Hors invariants → non.
-- **Flake local + GitHub source de vérité, lecture seule (v1), input = unité, retard sur
-  l'amont GitHub, agnostique au flake** : invariants durs (cf. DESIGN.md). Passer en écriture
-  (`nix flake update`, `nixos-rebuild`, `rollback`) = décision DESIGN explicite, pas un PLAN
-  d'impl discret.
-- **Le token GitHub est un secret** : jamais dans `query`/`model`, jamais dans une fixture/golden.
-- **Git hybride** : branche + commits atomiques par Claude ; merge/push/tag par l'utilisateur.
-- **Nix** : toujours `nix develop --command …` pour les commandes non interactives.
-- **`tmp/`** : scratch non commité (handoffs design, notes, sorties de travail).
-- **Outillage release** (`renovate`, `git-cliff`, CI + workflow release) : en place dès
-  v0.1.0 (cf. README.md §Release). Le tag reste posé par l'utilisateur.
-
----
-
-**Dernière mise à jour :** 2026-08-08
-**Statut :** Actif
+**Last updated:** 2026-10-18
+**Status:** Active
