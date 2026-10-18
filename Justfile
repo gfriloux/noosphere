@@ -1,8 +1,15 @@
 default:
     @just --list
 
-# Porte de qualité complète : format + lint + test. Seule source de vérité des gates.
-ci: fmt-check lint test
+# Full quality gate. The only source of truth for the gates — pre-commit and CI call in here
+# rather than listing recipes of their own.
+ci: ci-hermetic lint
+
+# The subset that needs neither DankMaterialShell nor Quickshell nor a network: this is what
+# CI runs, because a GitHub runner has no DMS and therefore cannot resolve the QML imports
+# (see scripts/qml-import-paths). Naming it here keeps the Justfile the single definition of
+# both gates, with the difference between them explicit instead of duplicated in ci.yml.
+ci-hermetic: fmt-check check-manifest test
 
 # Formate le QML en place (qmlformat).
 fmt:
@@ -54,6 +61,12 @@ lint:
         printf 'lint: %s finding(s) — this gate blocks at zero\n' "$(printf '%s\n' "$findings" | grep -c .)" >&2
         exit 1
     fi
+
+# Check plugin.json against DankMaterialShell's published schema (vendored under
+# tests/vendor/). The manifest is the only written contract between this plugin and its host,
+# and this is the one gate CI can run: it needs neither DMS nor Quickshell.
+check-manifest:
+    @scripts/check-manifest
 
 # Tests golden : qmltestrunner exécute les transforms JS sur fixtures → compare aux goldens.
 test:

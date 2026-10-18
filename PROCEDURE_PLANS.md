@@ -99,10 +99,12 @@ document **redefines** the gates — a list elsewhere (here, `CLAUDE.md`, `READM
 convenience copy of the `Justfile`, never a second source.
 
 ```bash
-just fmt-check   # qmlformat — no unformatted file
-just lint        # qmllint — no warning tolerated
-just test        # goldens (frozen inputs → model) + Qt Quick Test
-just ci          # all three in a row
+just fmt-check       # qmlformat — no unformatted file
+just check-manifest  # plugin.json against DMS's published schema (vendored)
+just test            # goldens (frozen inputs → model) + Qt Quick Test
+just lint            # qmllint — blocks at zero; needs DMS installed
+just ci              # all four
+just ci-hermetic     # all but lint: the subset CI can run (no DMS on a runner)
 ```
 
 > **`lint` needs DankMaterialShell installed, and blocks at zero.** `qmllint` cannot resolve

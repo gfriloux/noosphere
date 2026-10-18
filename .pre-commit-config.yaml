@@ -28,3 +28,9 @@ repos:
         entry: just lint
         files: \.qml$
         pass_filenames: false
+      - id: check-manifest
+        name: check-manifest
+        language: system
+        entry: just check-manifest
+        files: ^plugin\.json$
+        pass_filenames: false
