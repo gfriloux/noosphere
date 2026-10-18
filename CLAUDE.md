@@ -1,76 +1,95 @@
 # CLAUDE.md
 
-Guidage pour Claude Code (claude.ai/code) dans ce dépôt.
+Guidance for Claude Code (claude.ai/code) in this repository.
 
-> **Avant tout travail sur le code, lire [`DESIGN.md`](./DESIGN.md) puis
-> [`PROCEDURE_PLANS.md`](./PROCEDURE_PLANS.md). On ne code pas sans plan validé.**
+> **Before any work on the code, read [`DESIGN.md`](./DESIGN.md) — it outranks every
+> skill.** The process is **superpowers**: brainstorm → design → plan → execute → review →
+> integrate. **Then read [`PROCEDURE_PLANS.md`](./PROCEDURE_PLANS.md)** — it holds this
+> project's specifics (gates, goldens, toolchain, language, git identity, backlog), and
+> nothing else.
+> **No code without an approved plan.**
 
-## Ce qu'est noosphere
+## What noosphere is
 
-Widget de **suivi de dérive de flake NixOS** pour **Quickshell / DankMaterialShell** :
-badge d'état dans la barre (état de dérive + compteur d'inputs en retard) + popup cockpit
-listant les inputs et leur retard sur l'amont. Compare le `flake.lock` local (via
-`nix flake metadata --json`) avec la branche amont sur **GitHub** (API compare), en
-**lecture seule** (v1), par polling. Aucune configuration côté serveur. Détails et
-invariants : `DESIGN.md`.
+A **NixOS flake drift tracker** widget for **Quickshell / DankMaterialShell**: a status
+badge in the bar (drift state + count of inputs behind) + a cockpit popup listing the inputs
+and how far each lags behind upstream. It compares the local `flake.lock` (through
+`nix flake metadata --json`) against the upstream branch on **GitHub** (compare API),
+**read-only** (v1), by polling. No server-side configuration. Details and invariants:
+`DESIGN.md`.
 
-## Pile & structure
+## Stack & structure
 
-- **Vue** : QML / Qt Quick (Quickshell), Material 3, Catppuccin Mocha.
-- **Données** : couche `query` (argv `nix flake metadata` + URL compare GitHub, purs) →
-  service `Noosphere.qml` (exécute Process `nix`, interroge GitHub par `XMLHttpRequest`,
-  header `Authorization: Bearer` si token) → `model` (modèle de dérive, pur/testable) →
-  `view` (QML). Le QML ne
-  **construit** jamais de commande ni d'URL en direct.
+- **View**: QML / Qt Quick (Quickshell), Material 3, Catppuccin Mocha.
+- **Data**: the `query` layer (argv for `nix flake metadata` + GitHub compare URLs, pure) →
+  the `Noosphere.qml` service (runs `nix` through `Process`, queries GitHub through
+  `XMLHttpRequest`, `Authorization: Bearer` header when a token is set) → `model` (the drift
+  model, pure/testable) → `view` (QML). The QML **never** builds a command or a URL itself.
 
 ```
-src/            ← QML Quickshell + couches query/model
-tests/          ← fixtures (nix flake metadata + compare GitHub figés) + goldens (modèle attendu)
-.claude/plans/  ← plans de version (plan.md, manual_tests.md, phase0_results.md)
-tmp/            ← scratch non commité (handoff design, notes)
+src/                     ← Quickshell QML + query/model layers
+tests/                   ← frozen fixtures (nix metadata + GitHub compare) + goldens
+docs/superpowers/specs/  ← designs (brainstorming output)
+docs/superpowers/plans/  ← plans, verification included (writing-plans output)
+.claude/plans/           ← frozen archive of the v0.1.0 … v0.3.0 plans
+tmp/, .superpowers/      ← uncommitted scratch (notes; agent ledgers and briefs)
 ```
+
+## Language
+
+English is the project's default language — documents, code comments, commit messages, and
+the software's own copy. **The UI copy is French today** and stays French until the
+English/i18n plan lands; a French UI string is quoted when a document describes it, never
+silently translated as a side effect of another change. This rule **differs from
+astropath's** ("English docs, French UI") — do not copy astropath's version here. Details,
+including the published changelog and GitHub Issues: `PROCEDURE_PLANS.md` §8.
 
 ## Dev environment
 
-Toujours entrer le dev shell Nix avant de builder/tester :
+Always enter the Nix dev shell before building/testing:
 
 ```bash
 nix develop
 ```
 
-Pour les commandes non interactives : `nix develop --command just ci`.
+For non-interactive commands: `nix develop --command just ci`.
 
-## Commandes
+## Commands
 
 ```bash
-just ci          # porte complète : fmt-check + lint + test
-just fmt         # qmlformat -i (formate en place)
-just fmt-check   # vérifie le format, échoue si non conforme
-just lint        # qmllint, aucun warning toléré
-just test        # golden (entrées figées → modèle) + Qt Quick Test
-just run         # (à venir) lance le widget dans Quickshell
-just bless       # régénère les goldens (relire le diff)
-just mock        # mock du compare GitHub (scenario : drift | uptodate | ratelimit | error)
-just dev-bar     # instance DMS isolée chargeant le worktree
+just ci          # full gate: fmt-check + lint + test
+just fmt         # qmlformat -i (formats in place)
+just fmt-check   # checks formatting, fails if non-conforming
+just lint        # qmllint, no warning tolerated — currently blind, see issue #6
+just test        # goldens (frozen inputs → model) + Qt Quick Test
+just bless       # regenerates the goldens (review the diff)
+just mock        # GitHub compare mock (scenario: drift | uptodate | ratelimit | error)
+just dev-bar     # isolated DMS instance loading the worktree
+just changelog   # regenerates CHANGELOG.md through git-cliff
 ```
 
-Le `Justfile` est la **seule** définition des gates ; pre-commit et la CI l'appellent.
+The `Justfile` is the **only** definition of the gates; pre-commit and CI call it.
 
-## Garde-fous (ce qui ne change pas)
+## Guardrails (what does not change)
 
-- **DESIGN.md fait foi.** Hors invariants → non. Flake local + GitHub source de vérité,
-  **lecture seule (v1)**, **l'input est l'unité**, retard mesuré sur l'amont GitHub
-  (`ahead_by`), **agnostique au flake** (chemin + owner/repo + branche + token) : invariants
-  durs. Passer en écriture (`nix flake update`, `nixos-rebuild`, `rollback`) = décision
-  DESIGN explicite + PLAN dédié, pas un ajout discret.
-- **Le token GitHub est un secret.** Il vit dans la config / le service `Noosphere.qml`,
-  **jamais** dans les couches `query`/`model`, **jamais** dans une fixture ou un golden.
-- **Git : hybride.** Claude travaille sur une **branche dédiée**, commite **atomiquement**
-  (Conventional Commits, cf. PROCEDURE_PLANS.md §3), et ne fait **jamais** `merge`/`push`/`tag`.
-  L'utilisateur relit, merge sur `main`, push.
-- **Doc dans le même commit** que le code qu'elle décrit.
-- **`tmp/`** : jamais commité.
-- **Couche données déterministe** : tout changement de `query`/`model` passe par une
-  fixture + un golden (cf. PROCEDURE_PLANS.md §4).
-- **Outillage release** (renovate, git-cliff, CI + workflow release) : en place dès v0.1.0.
-  Le process de release est dans `README.md` ; le tag reste posé par l'utilisateur.
+- **DESIGN.md is authoritative.** Outside the invariants → no. Local flake + GitHub as the
+  source of truth, **read-only (v1)**, **the input is the unit**, lag measured against GitHub
+  upstream (`ahead_by`), **flake-agnostic** (path + owner/repo + branch + token): hard
+  invariants. Moving to writes (`nix flake update`, `nixos-rebuild`, `rollback`) = an
+  explicit DESIGN decision + a dedicated plan, never a quiet addition.
+- **The GitHub token is a secret.** It lives in the config / the `Noosphere.qml` service,
+  **never** in the `query`/`model` layers, **never** in a fixture or a golden.
+- **Git: delegated.** Claude works on a **dedicated branch**, commits **atomically**
+  (Conventional Commits, see PROCEDURE_PLANS.md §3), **announces a commit series before
+  running it** — the commits are signed, so one passphrase covers the burst — and may run
+  `merge`/`push`/`tag`. Integration is a `--no-ff` merge into `main` under
+  `superpowers:finishing-a-development-branch`. Claude stops for **decisions**, not for
+  steps.
+- **Docs in the same commit** as the code they describe.
+- **`tmp/` and `.superpowers/`**: never committed.
+- **Deterministic data layer**: any change to `query`/`model` goes through a fixture + a
+  golden (see PROCEDURE_PLANS.md §5).
+- **GitHub Issues is the only backlog.** No `TODO.md`, no second list in the repository.
+- **Release tooling** (Renovate, git-cliff, CI + the release workflow) has been in place
+  since v0.1.0. The sequence is in `README.md` §Release; the tag is signed, and the
+  passphrase prompt is the owner's stop.
