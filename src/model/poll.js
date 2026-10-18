@@ -37,7 +37,15 @@ function create(cfg) {
         phase: "",       // "repo" | "compare" — what the awaited response is
         awaiting: false, // is a request in flight from the driver's point of view
         seq: 0,
-        token: -1        // token of the awaited request; never matched once invalidated
+        token: -1,       // token of the awaited request; never matched once invalidated
+        // The last NON-fatal GitHub error of this poll. A fatal one ends the poll and
+        // travels in the `fail` effect; a non-fatal one only makes its own input
+        // indeterminate, and used to be forgotten. But when every input fails non-fatally
+        // the poll still commits with nothing verified, and that is the commonest failure
+        // there is — an offline laptop. Keeping the cause here is what lets the status row
+        // say "network unreachable" instead of only "no input could be verified".
+        lastCause: "",
+        lastStatus: 0
     };
 }
 
@@ -70,11 +78,17 @@ function commitStatus(st) {
         return {
             connectionStatus: "error",
             cause: "nothing-verified",
+            // Why nothing could be verified, when the poll saw a reason. "" when every
+            // input simply went unattributed without an HTTP error of its own.
+            detail: st.lastCause,
+            status: st.lastStatus,
             touchLastCheck: false
         };
     return {
         connectionStatus: "live",
         cause: "",
+        detail: "",
+        status: 0,
         touchLastCheck: true
     };
 }
@@ -107,6 +121,10 @@ function begin(st, metaJsonText) {
     st.inputs = Model.parseMetadata(meta);
     st.behind = {};
     st.heads = {};
+    // A fresh poll forgets the previous one's cause, or a poll that fails to verify
+    // anything for a new reason would publish the old one.
+    st.lastCause = "";
+    st.lastStatus = 0;
     st.queue = st.inputs.filter(function (it) {
         return it.type === "github" && it.owner && it.repoName;
     });
@@ -131,6 +149,12 @@ function onHttpDone(st, token, status, text, timedOut) {
     var err = Model.githubError(status, text, timedOut);
     if (err && err.fatal)
         return _fail(st, err.code, err.status); // holds for every later request too
+    if (err) {
+        // Non-fatal: this input stays indeterminate and the poll moves on. Remember why,
+        // so a poll where EVERY input failed this way can still name the cause at commit.
+        st.lastCause = err.code;
+        st.lastStatus = err.status;
+    }
 
     var res = err ? null : _parse(text);
     var it = st.queue[st.cursor];

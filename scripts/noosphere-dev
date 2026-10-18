@@ -24,8 +24,12 @@ else
 fi
 src="$(cd "$src" && pwd)"
 
-if [ ! -f "$src/plugin.json" ] || [ ! -d "$src/src" ]; then
-    echo "noosphere-dev: '$src' holds no plugin.json + src/ — point at the repository root." >&2
+# translations/ is checked alongside the other two. Left unchecked, `ln -sfn` would happily
+# create a DANGLING symlink, and DMS's loader sets `printErrors: false` and simply tries the
+# next locale candidate — so the dev bar would come up English with nothing in the log. That
+# is the failure Review Focus 1 names, one layer down.
+if [ ! -f "$src/plugin.json" ] || [ ! -d "$src/src" ] || [ ! -d "$src/translations" ]; then
+    echo "noosphere-dev: '$src' holds no plugin.json + src/ + translations/ — point at the repository root." >&2
     exit 1
 fi
 command -v dms >/dev/null || { echo "noosphere-dev: 'dms' not found on PATH." >&2; exit 1; }

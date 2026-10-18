@@ -86,7 +86,7 @@ qmltestrunner, just):
 
 ```bash
 nix develop
-just ci        # full gate: fmt-check + check-manifest + check-translations + lint + test
+just ci        # full gate: fmt-check + check-manifest + check-translations + test + lint
 ```
 
 > **The `lint` leg needs DankMaterialShell installed.** `qmllint` cannot resolve DMS's `qs.*`

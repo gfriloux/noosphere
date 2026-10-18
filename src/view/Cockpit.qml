@@ -61,6 +61,15 @@ PopoutComponent {
         return I18n.trFor("noosphere", "%1 commits behind").arg(behind);
     }
 
+    // The status row's whole sentence. "nothing-verified" is a verdict, not a cause: when
+    // the poll also knows WHY nothing could be verified, both are said, which is what the
+    // pre-i18n wording did and what DESIGN invariant 7 asks for.
+    function statusText(cause, detail, status) {
+        if (cause === "nothing-verified" && detail)
+            return I18n.trFor("noosphere", "no input could be verified (%1)").arg(cockpit.causeText(detail, status));
+        return cockpit.causeText(cause, status);
+    }
+
     // The cause the service published, as a sentence. Every branch must be covered: an
     // unhandled code would silently render the generic fallback and hide what went wrong.
     function causeText(cause, status) {
@@ -321,7 +330,7 @@ PopoutComponent {
                     StyledText {
                         width: parent.width
                         visible: cockpit.isError
-                        text: I18n.trFor("noosphere", "%1 · retry").arg(cockpit.service ? cockpit.causeText(cockpit.service.errorCause, cockpit.service.errorStatus) : cockpit.causeText("", 0))
+                        text: I18n.trFor("noosphere", "%1 · retry").arg(cockpit.service ? cockpit.statusText(cockpit.service.errorCause, cockpit.service.errorDetail, cockpit.service.errorStatus) : cockpit.causeText("", 0))
                         font.pixelSize: Theme.fontSizeSmall
                         color: "#f38ba8"
                     }

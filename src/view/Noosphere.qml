@@ -40,7 +40,13 @@ QtObject {
     property string connectionStatus: "idle"
     // A cause CODE, not a sentence — the cockpit turns it into words. `errorStatus` carries
     // the HTTP status or the `nix` exit code when the cause names one.
+    //
+    // `errorDetail` is the second code a "nothing-verified" commit can carry: the non-fatal
+    // GitHub error every input hit. Without it the commonest failure of all — no network —
+    // reads only as "no input could be verified", which says that something broke without
+    // saying what, the very thing this layer exists to stop doing.
     property string errorCause: ""
+    property string errorDetail: ""
     property int errorStatus: 0
     property double lastCheck: 0 // unix seconds
     property int generation: 0 // current system generation number (0 = unknown)
@@ -48,7 +54,7 @@ QtObject {
 
     readonly property bool configured: flakePath.length > 0
 
-    // --- État ---
+    // --- State ---
     property var _st: null // the driver's state (src/model/poll.js)
     property bool _busy: false
     property var _pending: null // the in-flight HTTP request (only ever one): { xhr, timedOut, settled }
@@ -129,7 +135,8 @@ QtObject {
         var cs = Poll.commitStatus(root._st);
         root.connectionStatus = cs.connectionStatus;
         root.errorCause = cs.cause;
-        root.errorStatus = 0;
+        root.errorDetail = cs.detail;
+        root.errorStatus = cs.status;
         if (cs.touchLastCheck)
             root.lastCheck = Date.now() / 1000;
         root._busy = false;
@@ -142,6 +149,7 @@ QtObject {
         root._abortPending();
         root.connectionStatus = "error";
         root.errorCause = cause;
+        root.errorDetail = "";
         root.errorStatus = status || 0;
         root._busy = false;
     }

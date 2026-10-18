@@ -38,11 +38,15 @@ tmp/, .superpowers/      ← uncommitted scratch (notes; agent ledgers and brief
 ## Language
 
 English is the project's default language — documents, code comments, commit messages, and
-the software's own copy. **The UI copy is French today** and stays French until the
-English/i18n plan lands; a French UI string is quoted when a document describes it, never
-silently translated as a side effect of another change. This rule **differs from
-astropath's** ("English docs, French UI") — do not copy astropath's version here. Details,
-including the published changelog and GitHub Issues: `PROCEDURE_PLANS.md` §8.
+**the UI itself**. Since v0.5.0 every user-facing string is an English literal wrapped in
+`I18n.trFor("noosphere", "<English>")`; French is a **translation**, `translations/fr.json`,
+which DMS loads on its own. So: **new UI copy is written in English and wrapped**, and its
+French entry lands in the same commit — `just check-translations` fails otherwise, in both
+directions. Never add an unwrapped literal: the gate compares the table against the ids, not
+the language of an id, so an unwrapped French string would pass and could never be
+translated away. This rule **differs from astropath's** ("English docs, French UI") — do not
+copy astropath's version here. Details, including the published changelog and GitHub Issues:
+`PROCEDURE_PLANS.md` §8.
 
 ## Dev environment
 

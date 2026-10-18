@@ -188,6 +188,15 @@ in-flight request at a time is reasoned about effortlessly.
    cockpit's status row renders that cause rather than a fixed "the check failed" — up to
    v0.4.0 the cause was computed and then discarded, so a user saw that something broke but
    never what.
+
+   **"Nothing was verified" is a verdict, not a cause,** and the two are shown together. Most
+   GitHub failures are *non-fatal*: they make one input indeterminate and the poll moves on.
+   When every input fails that way — the commonest case of all being a machine with no
+   network — the poll still commits, and the verdict alone would once again say that
+   something broke without saying what. So the driver carries the last non-fatal cause
+   (`errorDetail`) to the commit, and the row reads
+   « no input could be verified (network unreachable) », both halves. A poll that verified
+   something publishes no detail.
 8. **Determinism of the data layer.** `query` + `model` are deterministic for a frozen set
    of inputs (`nix flake metadata` output + compare responses + `nvd diff` output) — that is
    what makes the golden tests possible. `behind`/`behindCount`/`barState` and

@@ -8,22 +8,19 @@
     "up to date": "à jour",
     "%1 commit behind": "%1 commit de retard",
     "%1 commits behind": "%1 commits de retard",
-
     "just now": "à l'instant",
     "%1 min ago": "il y a %1 min",
     "%1 h ago": "il y a %1 h",
     "%1 d ago": "il y a %1 j",
-
     "generation #%1 · activated %2": "génération n°%1 · activée %2",
     "current generation unknown": "génération courante inconnue",
     "upstream check · %1": "check amont · %1",
     "upstream check · pending…": "check amont · en attente…",
-
     "every %1 h": "cadence %1 h",
     "every %1 min": "cadence %1 min",
     "check now": "check maintenant",
-
     "no input could be verified": "aucun input n'a pu être vérifié",
+    "no input could be verified (%1)": "aucun input n'a pu être vérifié (%1)",
     "timed out": "délai dépassé",
     "network unreachable": "réseau injoignable",
     "GitHub token refused": "token GitHub refusé",
@@ -37,7 +34,6 @@
     "check interrupted (timed out)": "check interrompu (délai dépassé)",
     "out-of-queue response": "réponse hors file",
     "check failed": "échec du check",
-
     "CLOSURE DIFF": "DIFF DE CLOSURE",
     "resolving host…": "résolution de l'hôte…",
     "building…": "build…",
@@ -57,13 +53,11 @@
     "removed": "retiré",
     "REBOOT": "REBOOT",
     "recompute": "recalculer",
-
     "hostname not found": "hostname introuvable",
     "hostname resolution failed (code %1)": "résolution du hostname échouée (code %1)",
     "toplevel build failed (check the flake and the hostname)": "build du toplevel échoué (vérifier le flake et le hostname)",
     "nvd diff failed (code %1)": "nvd diff échoué (code %1)",
     "nvd produced no output": "nvd n'a produit aucune sortie",
-
     "Noosphere settings": "Réglages Noosphere",
     "Flake path": "Chemin du flake",
     "Local path of the NixOS flake to follow (the directory holding flake.nix / flake.lock). E.g. \"/etc/nixos\" or \"~/nixos\".": "Chemin local du flake NixOS à suivre (le répertoire contenant flake.nix / flake.lock). Ex. « /etc/nixos » ou « ~/nixos ».",

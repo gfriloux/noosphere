@@ -46,7 +46,11 @@ report() {
 # misses again, and returns the English term — so the UI looks right in English and is
 # untranslatable in every other language.
 
-wrong_plugin="$(grep -rn 'trFor(' "$src" | grep -v 'trFor("noosphere"' || true)"
+# Matched per OCCURRENCE, not per line. Five call sites in this repository put two trFor
+# calls on one line (a ternary with a branch each way); `grep -v` on whole lines would drop
+# the line as soon as ONE call on it were correct, and a typo sharing a line with a correct
+# neighbour would slip past the one check written to name it.
+wrong_plugin="$(grep -rnoP 'trFor\("[^"]*"' "$src" | grep -v 'trFor("noosphere"' || true)"
 if [ -n "$wrong_plugin" ]; then
     while IFS= read -r line; do
         [ -n "$line" ] || continue
@@ -73,10 +77,12 @@ if [ -z "$ids_raw" ]; then
     exit 1
 fi
 
+# All three created BEFORE the trap names them: under `set -u` a trap referring to a
+# variable an interrupted mktemp never assigned would itself error on the way out.
 ids_file="$(mktemp)"
-trap 'rm -f "$ids_file" "$keys_file" "$vals_file"' EXIT
 keys_file="$(mktemp)"
 vals_file="$(mktemp)"
+trap 'rm -f "$ids_file" "$keys_file" "$vals_file"' EXIT
 
 jq -r . <<<"$ids_raw" | sort -u >"$ids_file"
 echo "translations: $(wc -l <"$ids_file") source string(s) in src/"
@@ -123,13 +129,23 @@ for loc in "${LOCALES[@]}"; do
         report "$loc: entry \"$s\" matches no string in src/"
     done <<<"$orphan"
 
-    # An empty translation is worse than a missing one: `_lookup` treats "" as a miss and
-    # falls through to English, so the table claims coverage it does not give.
-    empty="$(jq -r '.[] | to_entries[] | select(.value == "") | .key' "$table")"
-    while IFS= read -r s; do
+    # Every value must be a non-empty STRING.
+    #
+    # Empty is worse than missing: `_lookup` treats "" as a miss and falls through to
+    # English, so the table claims coverage it does not give. A non-string is worse still.
+    # `_termIndex` indexes any TRUTHY value, so `"retry": 42` makes trFor return a number:
+    # a plain label then renders "42", and a placeholder id blows up, because the call site
+    # does `.arg(…)` on it and a number has no `.arg` — the binding throws and the slot goes
+    # blank. Checking only for "" let all of 42 / {} / [] through green.
+    bad_value="$(jq -r '.[] | to_entries[] | select((.value | type) != "string" or .value == "") | "\(.key)\t\(.value | type)"' "$table")"
+    while IFS=$'\t' read -r s kind; do
         [ -n "$s" ] || continue
-        report "$loc: entry \"$s\" is empty"
-    done <<<"$empty"
+        if [ "$kind" = "string" ]; then
+            report "$loc: entry \"$s\" is empty"
+        else
+            report "$loc: entry \"$s\" is a $kind, not a string"
+        fi
+    done <<<"$bad_value"
 
     # Placeholders. `.arg()` fills %1, %2 … in order; a translation that drops one renders a
     # sentence with a hole, and one that invents one renders a literal "%2".
